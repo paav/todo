@@ -15,7 +15,9 @@ if !exists(":Todo")
   command Todo call s:TodoOpen()
 endif
 
-let s:plugin_path = escape(expand('<sfile>:p:h'), '\')
+let s:plugin_dir = escape(expand('<sfile>:p:h'), '\')
+let s:base_dir = escape(expand('<sfile>:p:h:h'), '\')
+let s:db = s:base_dir . '/data/todo.db'
 
 augroup Todo
     autocmd!
@@ -23,18 +25,18 @@ augroup Todo
 augroup END
 
 function! s:TodoOpen()
-    exe 'pyfile ' . s:plugin_path . '/todo.py'
+    exe 'pyfile ' . s:plugin_dir . '/todo.py'
     topleft vnew Todo 
     python renderTasks()
 endfunction
 
 function! s:TodoSettings()"{{{
     setlocal buftype=nofile
-    setlocal bufhidden=hide
+    setlocal bufhidden=wipe
     setlocal noswapfile
     setlocal nobuflisted
     setlocal nomodifiable
-    setlocal filetype=todo
+    setlocal filetype=newtodo
     setlocal nonumber
 endfunction"}}}
 
