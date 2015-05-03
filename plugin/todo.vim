@@ -21,13 +21,32 @@ let s:db = s:base_dir . '/data/todo.db'
 
 augroup Todo
     autocmd!
-    autocmd BufNewFile Todo call s:TodoSettings()
+    autocmd BufEnter Todo call s:TodoSettings()
+    autocmd BufEnter TodoAdd call s:TodoSettingsAdd()
+    autocmd BufWinLeave TodoAdd call s:TodoSave()
 augroup END
 
 function! s:TodoOpen()
     exe 'pyfile ' . s:plugin_dir . '/todo.py'
     topleft vnew Todo 
     python renderTasks()
+endfunction
+
+function! s:TodoAdd()"{{{
+    new TodoAdd
+endfunction"}}}
+
+function! s:TodoSave()"{{{
+    python saveTask()
+endfunction"}}}
+
+function! s:TodoDelete()"{{{
+    python deleteTask()
+endfunction"}}}
+
+function! s:TodoMappings()"{{{
+    nnoremap <script> <silent> <buffer> n :call <sid>TodoAdd()<cr>
+    nnoremap <script> <silent> <buffer> d :call <sid>TodoDelete()<cr>
 endfunction
 
 function! s:TodoSettings()"{{{
@@ -38,6 +57,14 @@ function! s:TodoSettings()"{{{
     setlocal nomodifiable
     setlocal filetype=newtodo
     setlocal nonumber
+    call s:TodoMappings()
+endfunction"}}}
+
+function! s:TodoSettingsAdd()"{{{
+    setlocal noswapfile
+    setlocal nonumber
+    setlocal bufhidden=wipe
+    setlocal nobuflisted
 endfunction"}}}
 
 let &cpo = s:old_cpo
