@@ -6,6 +6,8 @@ import time
 # TODO: make something with this
 BUF_MAIN = 'Todo'
 DATABASE = vim.eval('s:db')
+edited_task = None
+
 
 class Db:
     def __init__(self):
@@ -54,9 +56,12 @@ def create_tasks_table(tasks):
 def saveTask():
     title = vim.current.buffer[0]
     body = '\n'.join(vim.current.buffer[1:])
-    
-    Task({'title': title,
-          'body': body}).save()
+    attrs = {'title': title, 'body': body}
+    if edited_task:
+        edited_task.attributes = attrs
+        edited_task.save()
+    else:
+        Task(attrs).save()
 
     render_tasks()
 
@@ -68,6 +73,21 @@ def deleteTask():
     Task.instance().deleteById(id)
 
     render_tasks()
+
+def edit():
+    # TODO: workaround
+    global edited_task
+    task = Task.instance().findById(get_id()) 
+    vim.command('new TodoEdit')
+    vim.current.buffer[:] = None
+    vim.current.buffer[0] = task.getAttr('title')
+    vim.current.buffer.append(task.getAttr('body').split('\n'))
+    vim.command('w')
+    edited_task = task
+
+def get_id():
+    line = vim.current.line
+    return line.split(None, 1)[0]
 
 def getBuffByName(buffName):
     buffNum = vim.eval('bufnr("%s")' % buffName)
@@ -85,12 +105,13 @@ def get_buffer(bufname):
 
     return vim.buffers[bufnr]
         
-class Task:
+class Task(object):
 
     def __init__(self, attributes, dbconn = None):
         self.dbconn = Db.connection()
+        self.dbcur = self.dbconn.cursor()
 
-        self.attributes = {
+        self._attributes = {
             'id':           None,
             'title':        '',
             'body':         '',
@@ -98,14 +119,31 @@ class Task:
             'priority':     0
         }
 
-        self.attributes.update(attributes)
+        self._attributes.update(attributes)
+        self._isnew = True
+
+    @property
+    def isnew(self):
+        return self._isnew
+
+    @isnew.setter
+    def isnew(self, value):
+        self._isnew = value
+
+    @property
+    def attributes(self):
+        return self._attributes
+
+    @attributes.setter
+    def attributes(self, value):
+        self._attributes.update(value)
 
     @classmethod
     def instance(cls):
         return cls({})
 
     def getAttributes(self):
-        return self.attributes 
+        return self._attributes 
 
     def findAll(self):
         cur = self.dbconn.cursor()
@@ -121,16 +159,31 @@ class Task:
 
         return tasks
 
+    def findById(self, id):
+        cur = self.dbconn.cursor()
+        sql = 'SELECT * FROM task WHERE id=?'
+        cur.execute(sql, (id,))
+        task = Task(Task.row2attrs(cur.fetchone()))
+        task.isnew = False
+        return task
+
+    @staticmethod
+    def row2attrs(row):
+        """Convert sqlite3.Row to attributes dict."""
+        return dict(zip(row.keys(), list(row)))
+
     def save(self):
         cur = self.dbconn.cursor()
-
         attrs = self.attributes
-        columns = ','.join(attrs.keys())
-        pholders = ('?,' * len(attrs))[:-1]
-
-        sql = 'INSERT INTO task (' + columns +') VALUES(' + pholders + ')'
-        params = tuple(attrs.values())
-
+        if not self.isnew:
+            sqlpart = ','.join(map(lambda x: x + '=?', attrs.keys()))
+            sql = 'UPDATE task SET ' + sqlpart + ' WHERE id=?'
+            params = tuple(attrs.values() + [attrs['id']]) 
+        else:
+            columns = ','.join(attrs.keys())
+            pholders = ('?,' * len(attrs))[:-1]
+            sql = 'INSERT INTO task (' + columns +') VALUES(' + pholders + ')'
+            params = tuple(attrs.values()) 
         cur.execute(sql, params) 
         self.dbconn.commit()
 

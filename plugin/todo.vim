@@ -24,6 +24,8 @@ augroup Todo
     autocmd BufEnter Todo call s:TodoSettings()
     autocmd BufEnter TodoAdd call s:TodoSettingsAdd()
     autocmd BufWinLeave TodoAdd call s:TodoSave()
+    autocmd BufEnter TodoEdit call s:TodoSettingsAdd()
+    autocmd BufWinLeave TodoEdit call s:TodoSave()
 augroup END
 
 function! s:TodoOpen()
@@ -44,9 +46,14 @@ function! s:TodoDelete()"{{{
     python deleteTask()
 endfunction"}}}
 
+function! s:TodoEdit()"{{{
+    python edit()
+endfunction"}}}
+
 function! s:TodoMappings()"{{{
     nnoremap <script> <silent> <buffer> n :call <sid>TodoAdd()<cr>
     nnoremap <script> <silent> <buffer> d :call <sid>TodoDelete()<cr>
+    nnoremap <script> <silent> <buffer> e :call <sid>TodoEdit()<cr>
 endfunction
 
 function! s:TodoSettings()"{{{
