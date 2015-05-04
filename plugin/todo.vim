@@ -29,7 +29,7 @@ augroup END
 function! s:TodoOpen()
     exe 'pyfile ' . s:plugin_dir . '/todo.py'
     topleft vnew Todo 
-    python renderTasks()
+    python render_tasks()
 endfunction
 
 function! s:TodoAdd()"{{{
