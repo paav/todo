@@ -74,6 +74,7 @@ function! s:TodoSettings()"{{{
     setlocal nomodifiable
     setlocal filetype=newtodo
     setlocal nonumber
+    setlocal cursorline
     call s:TodoMappings()
 endfunction"}}}
 
