@@ -50,10 +50,20 @@ function! s:TodoEdit()"{{{
     python edit()
 endfunction"}}}
 
+function! s:TodoIncPriority()"{{{
+    python priority_add(1)
+endfunction"}}}
+
+function! s:TodoDecPriority()"{{{
+    python priority_add(-1)
+endfunction"}}}
+
 function! s:TodoMappings()"{{{
     nnoremap <script> <silent> <buffer> n :call <sid>TodoAdd()<cr>
     nnoremap <script> <silent> <buffer> d :call <sid>TodoDelete()<cr>
     nnoremap <script> <silent> <buffer> e :call <sid>TodoEdit()<cr>
+    nnoremap <script> <silent> <buffer> = :call <sid>TodoIncPriority()<cr>
+    nnoremap <script> <silent> <buffer> - :call <sid>TodoDecPriority()<cr>
 endfunction
 
 function! s:TodoSettings()"{{{

@@ -81,6 +81,13 @@ def edit():
     vim.command('w')
     edited_task = task
 
+def priority_add(num):
+    """Increase/decrease task priority by 1."""
+    task = Task.instance().findById(get_id()) 
+    task.setAttr('priority', task.getAttr('priority') + num)
+    task.save()
+    render_tasks()
+
 def get_id():
     line = vim.current.line
     return line.split(None, 1)[0]
@@ -144,7 +151,7 @@ class Task(object):
     def findAll(self):
         cur = self.dbconn.cursor()
 
-        sql = 'SELECT * FROM task'
+        sql = 'SELECT * FROM task ORDER BY priority DESC'
         cur.execute(sql)
 
         tasks = []
