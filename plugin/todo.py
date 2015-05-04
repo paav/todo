@@ -66,11 +66,7 @@ def saveTask():
     render_tasks()
 
 def deleteTask():
-    line = vim.current.line
-    id = line.split(None, 1)[0]
-    print(id)
-
-    Task.instance().deleteById(id)
+    Task.instance().deleteById(get_id())
 
     render_tasks()
 
