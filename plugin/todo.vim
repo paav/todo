@@ -29,21 +29,23 @@ augroup Todo
 augroup END
 
 function! s:TodoOpen()
+    " TODO: replace with import
     exe 'pyfile ' . s:plugin_dir . '/todo.py'
     topleft vnew Todo 
-    python render_tasks()
+    " python render_tasks()
+    python render_tasks_new()
 endfunction
 
 function! s:TodoAdd()"{{{
-    new TodoAdd
+    python add()
 endfunction"}}}
 
 function! s:TodoSave()"{{{
-    python saveTask()
+    python save()
 endfunction"}}}
 
 function! s:TodoDelete()"{{{
-    python deleteTask()
+    python delete()
 endfunction"}}}
 
 function! s:TodoEdit()"{{{
@@ -81,7 +83,6 @@ endfunction"}}}
 function! s:TodoSettingsAdd()"{{{
     setlocal noswapfile
     setlocal nonumber
-    setlocal bufhidden=wipe
     setlocal nobuflisted
 endfunction"}}}
 
