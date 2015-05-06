@@ -16,20 +16,31 @@ def render_tasks():
     task_list.render()
 
 def save():
+    global cur_task
     attrs = parse_task_attrs()
-    if not attrs:
-        return
-    if cur_task:
-        cur_task.attrs = attrs
-        cur_task.save()
-    else:
-        Task(attrs, isnew=True).save()
+    if attrs:
+        if cur_task:
+            cur_task.attrs = attrs
+            cur_task.save()
+            cur_task = None
+        else:
+            newtask = Task(attrs, isnew=True)
+            newtask.save()
+            task_list.last_task_at_cursor = newtask
+    task_list.render()
+
+def refresh():
     task_list.render()
 
 def delete():
     task = task_list.get_task_at_cursor()
+    cursor_save = task_list.get_cursor()
     task.delete()
     task_list.render()
+    try:
+        task_list.set_cursor(cursor_save)
+    except:
+        task_list.set_cursor(cursor_save - 1)
 
 def add():
     vimc.open_edit_win()
@@ -39,15 +50,14 @@ def edit():
     cur_task = task_list.get_task_at_cursor()
     if not cur_task:
         return
-    print(cur_task.isnew)
     cur_task.edit()
 
 def priority_add(num):
     """Increase/decrease task priority by 1."""
-    task = Task.instance().findById(get_id()) 
+    task = task_list.get_task_at_cursor()
     task.setAttr('priority', task.getAttr('priority') + num)
     task.save()
-    render_tasks()
+    task_list.render()
 
 def parse_task_attrs():
     buf = vimc.get_buffer(BUFNAME_EDIT)
@@ -79,8 +89,6 @@ class Vim:
         buf = vim.current.buffer
         opt_save = buf.options['modifiable']
         buf.options['modifiable'] = True
-        # vim.current.buffer = self.get_buffer(self.bufmain)
-        # vim.command('setlocal modifiable')
         vim.current.buffer[:] = None
         vim.current.buffer[:] = lines
         if self.is_writable(buf):
@@ -110,12 +118,20 @@ class Vim:
         vim.current.buffer[:] = None
         vim.command('write')
 
+    def set_cursor(self, row):
+        vim.current.window.cursor = (row, 1)
+
+    def get_cursor(self):
+        return (vim.current.window.cursor)[0]
+
 
 class TaskList:
 
     def __init__(self):
         self.vim = Vim()
         self.populate() 
+        self.last_task_at_cursor = None
+        self.tbody_1strow_lnum = 1
 
     def populate(self):
         self.tasks = Task.instance().findAll()
@@ -123,6 +139,11 @@ class TaskList:
     def render(self):
         self.vim.open_main_win()
         self.vim.write(self.create_table())
+        if self.last_task_at_cursor:
+            lnum = self.last_task_lnum()
+        else:
+            lnum = self.tbody_1strow_lnum 
+        self.vim.set_cursor(lnum)
 
     def create_table(self):
         # TODO: rewrite this
@@ -131,19 +152,41 @@ class TaskList:
         keys = attributes.keys()
         colnames = dict(zip(keys, keys))
         format = '%(id)-5s%(create_date)-18s%(title)-40s%(priority)-10s'
-        lHeader = [format % colnames, '-' * 73]
-        lBody = []
+        thead_lines = [format % colnames, '-' * 73]
+        self.tbody_1strow_lnum = len(thead_lines) + 1
+        tbody_lines = []
         for task in self.tasks:
-            lBody.append(format % task.getAttributes())
-        lTable = lHeader + lBody
-        return lTable;
+            tbody_lines.append(format % task.getAttributes())
+        table_lines = thead_lines + tbody_lines
+        return table_lines;
 
     def get_task_at_cursor(self):
         lnum = self.vim.get_line_number()
-        if lnum < 3:
+        if lnum < self.tbody_1strow_lnum:
             return None
-        return self.tasks[lnum - 3]
+        task = self.tasks[lnum - self.tbody_1strow_lnum]
+        self.last_task_at_cursor = task
+        return task 
 
+    def last_task_lnum(self):
+        last_task = self.last_task_at_cursor
+        try:
+            return self.get_index_of_task(last_task) + self.tbody_1strow_lnum
+        except ValueError:
+            return self.tbody_1strow_lnum
+
+    def get_index_of_task(self, task):
+        id = task.getAttr('id')
+        for i, t in enumerate(self.tasks):
+            if t.getAttr('id') == id:
+                return i
+        raise ValueError
+
+    def get_cursor(self):
+        return self.vim.get_cursor()
+
+    def set_cursor(self, lnum):
+        return self.vim.set_cursor(lnum)
 
 class Task(object):
     def __init__(self, attrs, dbconn=None, isnew=False):
@@ -212,17 +255,18 @@ class Task(object):
     def save(self):
         cur = self.dbconn.cursor()
         attrs = self.attrs
-        print(self.isnew)
-        if not self.isnew:
-            sqlpart = ','.join(map(lambda x: x + '=?', attrs.keys()))
-            sql = 'UPDATE task SET ' + sqlpart + ' WHERE id=?'
-            params = tuple(attrs.values() + [attrs['id']]) 
-        else:
+        if self.isnew:
             columns = ','.join(attrs.keys())
             pholders = ('?,' * len(attrs))[:-1]
             sql = 'INSERT INTO task (' + columns +') VALUES(' + pholders + ')'
             params = tuple(attrs.values()) 
+        else:
+            sqlpart = ','.join(map(lambda x: x + '=?', attrs.keys()))
+            sql = 'UPDATE task SET ' + sqlpart + ' WHERE id=?'
+            params = tuple(attrs.values() + [attrs['id']]) 
         cur.execute(sql, params) 
+        if cur.lastrowid:
+            self.setAttr('id', cur.lastrowid)
         self.dbconn.commit()
 
     def delete(self):
@@ -236,10 +280,10 @@ class Task(object):
         self.dbconn.commit()
 
     def getAttr(self, name):
-        return self.attrs[name]
+        return self._attrs[name]
 
     def setAttr(self, name, value):
-        self.attrs[name] = value
+        self._attrs[name] = value
 
     def edit(self):
         lines = [self.attrs['title']] + self.attrs['body'].split('\n')
