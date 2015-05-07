@@ -165,9 +165,21 @@ class TaskList:
         self.tbody_1strow_lnum = len(thead_lines) + 1
         tbody_lines = []
         for task in self.tasks:
-            tbody_lines.append(format % task.getAttributes())
+            attrs = task.getAttributes().copy()
+            tbody_lines.append(format % self.format_attrs(attrs)) 
         table_lines = thead_lines + tbody_lines
-        return table_lines;
+        return table_lines
+
+    @classmethod
+    def format_attrs(cls, attrs):
+        attrs['create_date'], = cls.format_dates(attrs['create_date'])
+        return attrs
+
+    @staticmethod
+    def format_dates(*tstamps):
+        def format_date(tstamp):
+            return datetime.fromtimestamp(tstamp).strftime('%x') 
+        return map(format_date, tstamps)
 
     def get_task_at_cursor(self):
         lnum = self.vim.get_line_number()
