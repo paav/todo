@@ -7,6 +7,7 @@ import time
 BUFNAME_MAIN = 'Todo'
 BUFNAME_EDIT = 'TodoEdit'
 DBFILE = vim.eval('s:db')
+TAG_MARK = '#'
 
 cur_task = None
 
@@ -16,15 +17,23 @@ def render_tasks():
 def save():
     global cur_task
     attrs = parse_task_attrs()
+    tags = parse_tags()
     if attrs:
         if cur_task:
             cur_task.attrs = attrs
             cur_task.save()
+            task_id = cur_task.getAttr('id')
             cur_task = None
         else:
             newtask = Task(attrs, isnew=True)
             newtask.save()
+            task_id = newtask.getAttr('id')
             task_list.last_task_at_cursor = newtask
+        Tag.inst().deleteAll('task_id=?', (task_id,))
+        if tags:
+            for tag in tags:
+                tag.task_id = task_id
+                tag.save()
     task_list.render()
 
 def refresh():
@@ -75,6 +84,20 @@ def parse_task_attrs():
     title = buf[0]
     body = '\n'.join(buf[1:])
     return {'title': title, 'body': body}
+
+def parse_tags():
+    buf = vimc.get_buffer(BUFNAME_EDIT)
+    last_line = buf[-1]
+    if last_line[0] != TAG_MARK:
+        return
+    str_tags = last_line[1:]
+    names = str_tags.split()
+    if not names:
+        return
+    tags = []
+    for name in names:
+        tags.append(Tag(name=name))
+    return tags
 
 def get_id():
     line = vim.current.line
@@ -306,13 +329,39 @@ class Task(object):
         self._attrs[name] = value
 
     def edit(self):
-        lines = [self.attrs['title']] + self.attrs['body'].split('\n')
+        lines = []
+        lines.append(self.attrs['title'])
+        if self.getAttr('body'):
+            lines.extend(self.attrs['body'].split('\n'))
         self.vim.open_edit_win()
         self.vim.write(lines)
 
     def finish(self):
         sql = 'UPDATE task SET done_date=? WHERE id=?'
         self.dbcur.execute(sql, (time.time(), self.getAttr('id')))
+        self.dbconn.commit()
+
+
+class Tag:
+    def __init__(self, name, id=None, task_id=None):
+        self.id = id
+        self.name = name
+        self.task_id = task_id
+        self.dbconn = Db.connection()
+        self.dbcur = self.dbconn.cursor()
+
+    @classmethod
+    def inst(cls):
+        return cls({})
+
+    def save(self):
+        sql = 'INSERT INTO tag (name,task_id) VALUES(?,?)'
+        self.dbcur.execute(sql, (self.name, self.task_id))
+        self.dbconn.commit()
+        
+    def deleteAll(self, cond, params):
+        sql = 'DELETE FROM tag WHERE ' + cond
+        self.dbcur.execute(sql, params)
         self.dbconn.commit()
 
 
