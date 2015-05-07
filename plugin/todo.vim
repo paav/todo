@@ -33,8 +33,7 @@ function! s:TodoOpen()
     " TODO: replace with import
     exe 'pyfile ' . s:plugin_dir . '/todo.py'
     topleft vnew Todo 
-    " python render_tasks()
-    python render_tasks_new()
+    python render_tasks()
 endfunction
 
 function! s:TodoAdd()
@@ -65,12 +64,17 @@ function! s:TodoRefresh()
     python refresh()
 endfunction
 
+function! s:TodoFinish()
+    python finish()
+endfunction
+
 function! s:TodoMappings()
     nnoremap <script> <silent> <buffer> n :call <sid>TodoAdd()<cr>
     nnoremap <script> <silent> <buffer> d :call <sid>TodoDelete()<cr>
     nnoremap <script> <silent> <buffer> e :call <sid>TodoEdit()<cr>
     nnoremap <script> <silent> <buffer> = :call <sid>TodoIncPriority()<cr>
     nnoremap <script> <silent> <buffer> - :call <sid>TodoDecPriority()<cr>
+    nnoremap <script> <silent> <buffer> f :call <sid>TodoFinish()<cr>
 endfunction
 
 function! s:TodoSettings()

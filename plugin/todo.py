@@ -8,9 +8,7 @@ BUFNAME_MAIN = 'Todo'
 BUFNAME_EDIT = 'TodoEdit'
 DBFILE = vim.eval('s:db')
 
-task_list = TaskList()
 cur_task = None
-vimc = Vim()
 
 def render_tasks():
     task_list.render()
@@ -44,6 +42,17 @@ def delete():
 
 def add():
     vimc.open_edit_win()
+
+def finish():
+    # TODO: repetitive code
+    task = task_list.get_task_at_cursor()
+    cursor_save = task_list.get_cursor()
+    task.finish()
+    task_list.render()
+    try:
+        task_list.set_cursor(cursor_save)
+    except:
+        task_list.set_cursor(cursor_save - 1)
 
 def edit():
     global cur_task
@@ -228,8 +237,7 @@ class Task(object):
 
     def findAll(self):
         cur = self.dbconn.cursor()
-
-        sql = 'SELECT * FROM task ORDER BY priority DESC'
+        sql = 'SELECT * FROM task WHERE done_date IS NULL ORDER BY priority DESC'
         cur.execute(sql)
 
         tasks = []
@@ -290,6 +298,11 @@ class Task(object):
         self.vim.open_edit_win()
         self.vim.write(lines)
 
+    def finish(self):
+        sql = 'UPDATE task SET done_date=? WHERE id=?'
+        self.dbcur.execute(sql, (time.time(), self.getAttr('id')))
+        self.dbconn.commit()
+
 
 class Db:
     def __init__(self):
@@ -300,3 +313,6 @@ class Db:
     @classmethod
     def connection(cls):
         return cls().conn
+
+task_list = TaskList()
+vimc = Vim()
