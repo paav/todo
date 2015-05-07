@@ -77,6 +77,12 @@ def priority_add(num):
     task.save()
     task_list.render()
 
+def apply_tag_filter():
+    msg = 'Filter by tags: '
+    vim.command('let str_tags = input("%s")' % msg)
+    str_tags = vim.eval('str_tags')
+    task_list.apply_tag_filter(str_tags.split())
+
 def parse_task_attrs():
     buf = vimc.get_buffer(BUFNAME_EDIT)
     if not buf[0]:
@@ -161,12 +167,15 @@ class TaskList:
 
     def __init__(self):
         self.vim = Vim()
-        self.populate() 
+        self.cond = ''
+        self.params = ()
         self.last_task_at_cursor = None
         self.tbody_1strow_lnum = 1
+        self.filter_by_tags = []
+        self.populate() 
 
     def populate(self):
-        self.tasks = Task.instance().findAll()
+        self.tasks = Task.instance().findAll(self.cond, self.params)
 
     def render(self):
         self.vim.open_main_win()
@@ -176,6 +185,18 @@ class TaskList:
         else:
             lnum = self.tbody_1strow_lnum 
         self.vim.set_cursor(lnum)
+
+    def apply_tag_filter(self, tags):
+        if tags:
+            cond = ' and '.join(['name=?'] * len(tags))
+            tags = Tag.inst().findAll(cond, tuple(tags)) 
+            task_ids = map(lambda t: t.task_id, tags)
+            self.cond = 'id IN(' + ','.join(['?'] * len(task_ids)) + ')'
+            self.params = tuple(task_ids)
+        else:
+            self.cond = ''
+            self.params = ()
+        self.render()
 
     def create_table(self):
         # TODO: rewrite this
@@ -270,17 +291,17 @@ class Task(object):
     def getAttributes(self):
         return self._attrs 
 
-    def findAll(self):
+    def findAll(self, cond='', params=()):
         cur = self.dbconn.cursor()
-        sql = 'SELECT * FROM task WHERE done_date IS NULL ORDER BY priority DESC'
-        cur.execute(sql)
-
+        sql = 'SELECT * FROM task WHERE done_date IS NULL'
+        if cond:
+            sql += ' AND %s ' % cond
+        sql +=  ' ORDER BY priority DESC'
+        cur.execute(sql, params)
         tasks = []
-
         for row in cur.fetchall():
             attrs = dict(zip(row.keys(), list(row)))
             tasks.append(Task(attrs, isnew=False))
-
         return tasks
 
     def findById(self, id):
@@ -364,6 +385,13 @@ class Tag:
         self.dbcur.execute(sql, params)
         self.dbconn.commit()
 
+    def findAll(self, cond, params):
+        sql = 'SELECT * FROM tag WHERE ' + cond
+        self.dbcur.execute(sql, params)
+        tags = []
+        for row in self.dbcur.fetchall():
+            tags.append(Tag(row['name'], row['id'], row['task_id']))
+        return tags
 
 class Db:
     def __init__(self):

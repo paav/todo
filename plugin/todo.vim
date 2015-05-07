@@ -68,13 +68,18 @@ function! s:TodoFinish()
     python finish()
 endfunction
 
+function! s:TodoApplyTagFilter()
+    python apply_tag_filter()
+endfunction
+
 function! s:TodoMappings()
     nnoremap <script> <silent> <buffer> n :call <sid>TodoAdd()<cr>
     nnoremap <script> <silent> <buffer> d :call <sid>TodoDelete()<cr>
     nnoremap <script> <silent> <buffer> e :call <sid>TodoEdit()<cr>
     nnoremap <script> <silent> <buffer> = :call <sid>TodoIncPriority()<cr>
     nnoremap <script> <silent> <buffer> - :call <sid>TodoDecPriority()<cr>
-    nnoremap <script> <silent> <buffer> f :call <sid>TodoFinish()<cr>
+    nnoremap <script> <silent> <buffer> d :call <sid>TodoFinish()<cr>
+    nnoremap <script> <silent> <buffer> f :call <sid>TodoApplyTagFilter()<cr>
 endfunction
 
 function! s:TodoSettings()
