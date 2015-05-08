@@ -13,6 +13,11 @@ set cpo&vim
 
 if !exists(":Todo")
   command Todo call s:TodoOpen()
+  command TodoToggle call s:TodoToggle()
+endif
+
+if !exists(":TodoToggle")
+  command TodoToggle call s:TodoToggle()
 endif
 
 let s:plugin_dir = escape(expand('<sfile>:p:h'), '\')
@@ -29,11 +34,32 @@ augroup Todo
     autocmd BufWinLeave TodoEdit call s:TodoSave()
 augroup END
 
+function! s:TodoIsVisible()"{{{
+    if bufwinnr(bufnr('Todo')) != -1
+        return 1
+    else
+        return 0
+    endif
+endfunction"}}}
+
+function! s:TodoToggle()
+    if s:TodoIsVisible()
+        call s:TodoClose()
+    else
+        call s:TodoOpen()
+    endif
+endfunction
+
 function! s:TodoOpen()
     " TODO: replace with import
     exe 'pyfile ' . s:plugin_dir . '/todo.py'
     topleft 65vnew Todo 
     python render_tasks()
+endfunction
+
+function! s:TodoClose()
+    exe bufwinnr(bufnr('Todo')) . "wincmd w"
+    quit
 endfunction
 
 function! s:TodoAdd()
