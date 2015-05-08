@@ -9,10 +9,43 @@ BUFNAME_MAIN = 'Todo'
 BUFNAME_EDIT = 'TodoEdit'
 DBFILE = vim.eval('s:db')
 TAG_MARK = '#'
+MSG_TIP ="""\
+" Press ? for help
+"""
+
+MSG_HELP ="""\
+" k: move cursor up
+" j: move cursor down 
+" d: delete task
+" e: edit task
+" f: filter tasks by tags
+" =: raise priority
+" -: drop priority
+" ?: toggle help\
+"""
+
+help_isvisible = False
 
 cur_task = None
 
+def toggle_help():
+    global help_isvisible
+    buf = vim.current.buffer
+    opt_save = buf.options['modifiable']
+    buf.options['modifiable'] = True
+    if help_isvisible:
+        buf[0:9] = None
+        help_isvisible = False    
+        buf.append(MSG_TIP.split('\n'), 0)
+    else:
+        buf[0:1] = None
+        buf.append(MSG_HELP.split('\n'), 0)
+        help_isvisible = True    
+    buf.options['modifiable'] = opt_save
+
 def render_tasks():
+    vimc.open_main_win()
+    vimc.write(MSG_TIP.split('\n'))
     task_list.render()
 
 def save():
@@ -124,12 +157,12 @@ class Vim:
         self.bufmain = 'Todo'
         self.bufedit = 'TodoEdit'
 
-    def write(self, lines):
+    def write(self, lines, offset=0):
         buf = vim.current.buffer
         opt_save = buf.options['modifiable']
         buf.options['modifiable'] = True
-        vim.current.buffer[:] = None
-        vim.current.buffer[:] = lines
+        vim.current.buffer[offset:] = None
+        vim.current.buffer[offset:] = lines
         if self.is_writable(buf):
             vim.command('w')
         buf.options['modifiable'] = opt_save
@@ -183,7 +216,7 @@ class TaskList:
 
     def render(self):
         self.vim.open_main_win()
-        self.vim.write(self.create_table())
+        self.vim.write(self.create_table(), offset=2)
         if self.last_task_at_cursor:
             lnum = self.last_task_lnum()
         else:

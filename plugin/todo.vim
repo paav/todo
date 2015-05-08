@@ -98,6 +98,10 @@ function! s:TodoApplyTagFilter()
     python apply_tag_filter()
 endfunction
 
+function! s:TodoToggleHelp()
+    python toggle_help()
+endfunction
+
 function! s:TodoMappings()
     nnoremap <script> <silent> <buffer> n :call <sid>TodoAdd()<cr>
     nnoremap <script> <silent> <buffer> d :call <sid>TodoDelete()<cr>
@@ -106,6 +110,7 @@ function! s:TodoMappings()
     nnoremap <script> <silent> <buffer> - :call <sid>TodoDecPriority()<cr>
     nnoremap <script> <silent> <buffer> d :call <sid>TodoFinish()<cr>
     nnoremap <script> <silent> <buffer> f :call <sid>TodoApplyTagFilter()<cr>
+    nnoremap <script> <silent> <buffer> ? :call <sid>TodoToggleHelp()<cr>
 endfunction
 
 function! s:TodoSettings()
