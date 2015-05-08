@@ -32,7 +32,7 @@ augroup END
 function! s:TodoOpen()
     " TODO: replace with import
     exe 'pyfile ' . s:plugin_dir . '/todo.py'
-    topleft vnew Todo 
+    topleft 65vnew Todo 
     python render_tasks()
 endfunction
 

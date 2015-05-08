@@ -1,3 +1,4 @@
+# -*- coding: utf8 -*-
 import vim
 import sqlite3
 from datetime import datetime
@@ -148,6 +149,9 @@ class Vim:
     def open_main_win(self):
         vim.current.buffer = self.get_buffer(self.bufmain)
 
+    def win_width(self):
+        return vim.current.window.width - 1
+
     def open_edit_win(self):
         vim.command('new %s' % self.bufedit)
         self.clear_buf()
@@ -175,7 +179,7 @@ class TaskList:
         self.populate() 
 
     def populate(self):
-        self.tasks = Task.instance().findAll(self.cond, self.params)
+        self.tasks = Task.inst().findAll(self.cond, self.params)
 
     def render(self):
         self.vim.open_main_win()
@@ -199,19 +203,24 @@ class TaskList:
         self.render()
 
     def create_table(self):
-        # TODO: rewrite this
         self.populate()
-        attributes = self.tasks[0].getAttributes()
-        keys = attributes.keys()
-        colnames = dict(zip(keys, keys))
-        format = '%(id)-5s%(create_date)-18s%(title)-40s%(priority)-10s'
-        thead_lines = [format % colnames, '-' * 73]
-        self.tbody_1strow_lnum = len(thead_lines) + 1
+        labels = Task.inst().attr_labels()
+        labels['tag'] = 'Tag'
+        format = ' %(create_date)-10s%(title)-37s%(tag)-12s%(priority)-s'
+        thead = format % labels 
+        tdelim = '─' * self.vim.win_width() 
         tbody_lines = []
+        # TODO: do something with 5
+        self.tbody_1strow_lnum = 5
         for task in self.tasks:
-            attrs = task.getAttributes().copy()
-            tbody_lines.append(format % self.format_attrs(attrs)) 
-        table_lines = thead_lines + tbody_lines
+            # TODO: drop copy() from here
+            fields = task.attrs.copy()
+            try:
+                fields['tag'] = task.tag_names()[0]
+            except IndexError:
+                fields['tag'] = ''
+            tbody_lines.append(format % self.format_attrs(fields)) 
+        table_lines = [thead, tdelim] + tbody_lines
         return table_lines
 
     @classmethod
@@ -222,7 +231,9 @@ class TaskList:
     @staticmethod
     def format_dates(*tstamps):
         def format_date(tstamp):
-            return datetime.fromtimestamp(tstamp).strftime('%x') 
+            # %-d -- works only for unix like os
+            return unicode(datetime.fromtimestamp(tstamp).strftime('%-d %b'),
+                           'utf8') 
         return map(format_date, tstamps)
 
     def get_task_at_cursor(self):
@@ -285,11 +296,22 @@ class Task(object):
         self._attrs.update(value)
 
     @classmethod
-    def instance(cls):
+    def inst(cls):
         return cls({})
 
-    def getAttributes(self):
-        return self._attrs 
+    def attr_labels(self):
+        custom = {
+            'title': 'Title',
+            'create_date': 'Created',
+            'priority': 'Pri'
+        }
+        labels = self._default_labels()
+        labels.update(custom)
+        return labels 
+
+    def _default_labels(self):
+        keys = self._attrs.keys()
+        return dict(zip(keys, keys))
 
     def findAll(self, cond='', params=()):
         cur = self.dbconn.cursor()
@@ -310,6 +332,14 @@ class Task(object):
         cur.execute(sql, (id,))
         task = Task(Task.row2attrs(cur.fetchone()), isnew=False)
         return task
+
+    def tag_names(self):
+        sql = 'SELECT * FROM tag WHERE task_id=?'
+        self.dbcur.execute(sql, (self.getAttr('id'),))
+        tag_names = []
+        for row in self.dbcur.fetchall():
+            tag_names.append(row['name'])
+        return tag_names
 
     @staticmethod
     def row2attrs(row):
