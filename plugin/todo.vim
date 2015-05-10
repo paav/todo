@@ -122,6 +122,8 @@ function! s:TodoSettings()
     setlocal filetype=newtodo
     setlocal nonumber
     setlocal cursorline
+    setlocal conceallevel=3
+    setlocal concealcursor=nc
     call s:TodoMappings()
 endfunction
 

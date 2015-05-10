@@ -10,18 +10,19 @@ BUFNAME_EDIT = 'TodoEdit'
 DBFILE = vim.eval('s:db')
 TAG_MARK = '#'
 MSG_TIP ="""\
-" Press ? for help
+"Press ? for help
 """
 
 MSG_HELP ="""\
-" k: move cursor up
-" j: move cursor down 
-" d: delete task
-" e: edit task
-" f: filter tasks by tags
-" =: raise priority
-" -: drop priority
-" ?: toggle help\
+"k: move cursor up
+"j: move cursor down 
+"n: new task
+"e: edit task
+"d: delete task
+"f: filter tasks by tags
+"=: raise priority
+"-: drop priority
+"?: toggle help\
 """
 
 help_isvisible = False
@@ -34,7 +35,7 @@ def toggle_help():
     opt_save = buf.options['modifiable']
     buf.options['modifiable'] = True
     if help_isvisible:
-        buf[0:9] = None
+        buf[0:10] = None
         help_isvisible = False    
         buf.append(MSG_TIP.split('\n'), 0)
     else:
@@ -239,8 +240,9 @@ class TaskList:
         self.populate()
         labels = Task.inst().attr_labels()
         labels['tag'] = 'Tag'
-        format = ' %(create_date)-10s%(title)-37s%(tag)-12s%(priority)-s'
-        thead = format % labels 
+        format = '%(create_date)-10s%(title)-37s%(tag)-12s%(priority)-s'
+        # Add ~ for table head highlighting
+        thead = '~' + format % labels 
         tdelim = '─' * self.vim.win_width() 
         tbody_lines = []
         # TODO: do something with 5
@@ -252,7 +254,14 @@ class TaskList:
                 fields['tag'] = task.tag_names()[0]
             except IndexError:
                 fields['tag'] = ''
-            tbody_lines.append(format % self.format_attrs(fields)) 
+            # Add ` for row cell highlighting
+            pri = fields['priority']
+            pri_pfx = ''
+            if pri > 5:
+                pri_pfx = '!1'
+            elif pri > 2:
+                pri_pfx = '!2'
+            tbody_lines.append('`' + pri_pfx + format % self.format_attrs(fields)) 
         table_lines = [thead, tdelim] + tbody_lines
         return table_lines
 
