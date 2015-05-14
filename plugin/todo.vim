@@ -13,6 +13,10 @@ set cpo&vim
 
 let s:BUFNAME_MAIN = 'TodoMain'
 let s:MAINWIN_W = 65
+let s:DIR_BASE = escape(expand('<sfile>:p:h:h'), '\')
+let s:DIR_LIB = s:DIR_BASE . '/lib'
+
+let s:FILE_DB = s:DIR_BASE . '/data/todo.db'
 
 command! Todo call s:Open()
 command! TodoToggle call s:Toggle()
@@ -92,7 +96,73 @@ function! s:HelpWidget.toggle() abort
 endfunction
 
 
+" Class TasksTableWidget
+" ============================================================ 
+
+let s:TasksTableWidget = {}
+
+function! s:TasksTableWidget.create() abort
+    let self._isvisible = 0
+    let self._tasks = pyeval('tasklist.gettasks()')
+    return copy(self)
+endfunction
+
+function! s:TasksTableWidget.render() abort
+    let l:save_opt = &l:modifiable
+    let &l:modifiable = 1
+    " exe a:lnum . ',$delete'
+
+    call self._renderHead()
+
+    call self._renderBody()
+
+    let self._isvisible = 1
+    let &l:modifiable = l:save_opt
+endfunction
+
+function! s:TasksTableWidget._renderHead() abort
+    let @o = printf('%-10s%-32s%-10s%-10s', 'Created', 'Title', 'Tag', 'Pri') 
+    let @o .= "\n" . repeat('-', 60)
+    put o
+endfunction
+
+function! s:TasksTableWidget._renderBody() abort
+    let self._base_lnum = line('.') + 1
+    for task in self._tasks
+        call setline(line('.') + 1, self._tasktorow(task))
+        call cursor(line('.') + 1, col('.'))
+    endfor
+endfunction
+
+function! s:TasksTableWidget._tasktorow(task) abort
+    " Pick only first tag
+    let tag = get(a:task.tags, 0, {})
+    let tagname = !empty(tag) ? tag.name : '' 
+
+    return printf('%-13s%-32s%-10s%-5s',
+        \self._tstotimeformat(a:task.create_date, '%-d %b'),
+        \a:task.title, tagname, a:task.priority) 
+endfunction
+
+function! s:TasksTableWidget._tstotimeformat(ts, format)
+    return pyeval(
+        \'datetime.fromtimestamp(' . string(a:ts) . ').strftime("'
+            \ . a:format . '")')
+endfunction
+
+
 function! s:Open() abort
+        " python reload(todo)
+    " if !exists('g:todo_py_loaded')
+        python import sys
+        exe 'python sys.path.append("' . s:DIR_LIB . '")'
+        python import todo 
+        python from todo import tasklist
+        python from datetime import datetime
+        exe 'python todo.setdb("' . s:FILE_DB . '")'
+        let g:todo_py_loaded = 1
+    " endif
+
     if s:WinIsVisible(s:BUFNAME_MAIN)
         return
     endif
@@ -109,11 +179,22 @@ function! s:Open() abort
     " if !b:help_widget.isVisible()
         call b:help_widget.render()
     " endif
+
+    let b:tasks_table = s:TasksTableWidget.create()
+    call b:tasks_table.render()
 endfunction
 
 function! s:Close() abort
     call s:GotoWin(s:BUFNAME_MAIN)
     close
+endfunction
+
+function! s:GotoWin(bufname) abort
+    exe s:GetWinNum(a:bufname) . 'wincmd w' 
+endfunction
+
+function! s:GetWinNum(bufname) abort
+    return bufwinnr(bufnr(a:bufname))
 endfunction
 
 function! s:Toggle()
@@ -174,10 +255,6 @@ endfunction
 
 function! s:TodoApplyTagFilter()
     python apply_tag_filter()
-endfunction
-
-function! s:TodoToggleHelp()
-    python toggle_help()
 endfunction
 
 function! s:ApplyMainBufMaps()
