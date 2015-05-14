@@ -11,43 +11,121 @@ let g:loaded_todo = 1
 let s:old_cpo = &cpo
 set cpo&vim
 
-if !exists(":Todo")
-  command Todo call s:TodoOpen()
-  command TodoToggle call s:TodoToggle()
-endif
+let s:BUFNAME_MAIN = 'TodoMain'
+let s:MAINWIN_W = 65
 
-if !exists(":TodoToggle")
-  command TodoToggle call s:TodoToggle()
-endif
+command! Todo call s:Open()
+command! TodoToggle call s:Toggle()
+command! TodoClose call s:Close()
 
 let s:plugin_dir = escape(expand('<sfile>:p:h'), '\')
 let s:base_dir = escape(expand('<sfile>:p:h:h'), '\')
 let s:db = s:base_dir . '/data/todo.db'
 
-augroup Todo
+augroup todo
     autocmd!
-    autocmd BufEnter Todo call s:TodoSettings()
-    autocmd BufEnter Todo call s:TodoRefresh()
+    exe 'autocmd BufNewFile ' . s:BUFNAME_MAIN . ' call s:ApplyMainBufSettings()'
+    exe 'autocmd BufNewFile ' . s:BUFNAME_MAIN . ' call s:ApplyMainBufMaps()'
     autocmd BufEnter TodoAdd call s:TodoSettingsAdd()
     autocmd BufWinLeave TodoAdd call s:TodoSave()
     autocmd BufEnter TodoEdit call s:TodoSettingsAdd()
     autocmd BufWinLeave TodoEdit call s:TodoSave()
 augroup END
 
-function! s:TodoIsVisible()"{{{
-    if bufwinnr(bufnr('Todo')) != -1
+function! s:WinIsVisible(bufname) abort
+    if s:GetWinNum(a:bufname) != -1
         return 1
-    else
-        return 0
     endif
-endfunction"}}}
+    return 0
+endfunction
 
-function! s:TodoToggle()
-    if s:TodoIsVisible()
-        call s:TodoClose()
-    else
-        call s:TodoOpen()
+
+" Class HelpWidget
+" ============================================================ 
+
+let s:HelpWidget = {
+    \'_TEXT_INFO': ['Press ? for help'],
+    \'_TEXT_HELP': [
+            \'"j": move cursor down',
+            \'"k": move cursor up',
+            \'"n": new task',
+            \'"e": edit task'
+        \]
+\}
+
+function! s:HelpWidget.create() abort
+    let self._isvisible = 0
+    let self._curtext = self._TEXT_INFO
+    let self._prevtext = []
+    return copy(self)
+endfunction
+
+function! s:HelpWidget.render() abort
+    let l:save_opt = &l:modifiable
+    let &l:modifiable = 1
+
+    if !empty(self._prevtext) 
+        let prev_text_len = len(self._prevtext)
+        exe '1,' . prev_text_len . '$delete'
     endif
+
+    call append(0, self._curtext)
+    let self._isvisible = 1
+    let &l:modifiable = l:save_opt
+endfunction
+
+function! s:HelpWidget.isVisible() abort
+    return self._isvisible
+endfunction
+
+function! s:HelpWidget.toggle() abort
+    if empty(self._prevtext)
+        let self._prevtext = self._curtext
+        let self._curtext = self._TEXT_HELP
+    else
+        let l:curtext_save = self._curtext
+        let self._curtext = self._prevtext
+        let self._prevtext = l:curtext_save
+    endif
+    
+    call self.render()
+endfunction
+
+
+function! s:Open() abort
+    if s:WinIsVisible(s:BUFNAME_MAIN)
+        return
+    endif
+
+    call s:OpenMainWin()
+    setlocal modifiable
+    1,$delete
+    setlocal nomodifiable
+    
+    " if !exists('b:help_widget')
+        let b:help_widget = s:HelpWidget.create()
+    " endif
+
+    " if !b:help_widget.isVisible()
+        call b:help_widget.render()
+    " endif
+endfunction
+
+function! s:Close() abort
+    call s:GotoWin(s:BUFNAME_MAIN)
+    close
+endfunction
+
+function! s:Toggle()
+    if s:WinIsVisible(s:BUFNAME_MAIN)
+        call s:Close()
+    else
+        call s:Open()
+    endif
+endfunction
+
+function! s:OpenMainWin() abort
+    exe 'topleft ' . s:MAINWIN_W . 'vnew ' . s:BUFNAME_MAIN
 endfunction
 
 function! s:TodoOpen()
@@ -102,7 +180,7 @@ function! s:TodoToggleHelp()
     python toggle_help()
 endfunction
 
-function! s:TodoMappings()
+function! s:ApplyMainBufMaps()
     nnoremap <script> <silent> <buffer> n :call <sid>TodoAdd()<cr>
     nnoremap <script> <silent> <buffer> d :call <sid>TodoDelete()<cr>
     nnoremap <script> <silent> <buffer> e :call <sid>TodoEdit()<cr>
@@ -110,21 +188,19 @@ function! s:TodoMappings()
     nnoremap <script> <silent> <buffer> - :call <sid>TodoDecPriority()<cr>
     nnoremap <script> <silent> <buffer> d :call <sid>TodoFinish()<cr>
     nnoremap <script> <silent> <buffer> f :call <sid>TodoApplyTagFilter()<cr>
-    nnoremap <script> <silent> <buffer> ? :call <sid>TodoToggleHelp()<cr>
+    nnoremap <silent> <buffer> ? :call b:help_widget.toggle()<CR>
 endfunction
 
-function! s:TodoSettings()
+function! s:ApplyMainBufSettings()
     setlocal buftype=nofile
-    setlocal bufhidden=wipe
     setlocal noswapfile
     setlocal nobuflisted
     setlocal nomodifiable
-    setlocal filetype=newtodo
     setlocal nonumber
     setlocal cursorline
+    setlocal filetype=newtodo
     setlocal conceallevel=3
     setlocal concealcursor=nc
-    call s:TodoMappings()
 endfunction
 
 function! s:TodoSettingsAdd()
