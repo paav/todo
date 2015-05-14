@@ -135,7 +135,30 @@ class Task(Model):
         return dict(zip(row.keys(), list(row)))
 
     def save(self):
-        pass
+        cur = self._dbcon.cursor()
+        attrs = self.attrs
+        pk = attrs['id']
+        del attrs['id']
+        # pprint(self.__dict__)
+        if self.isnew:
+            return
+            columns = ','.join(attrs.keys())
+            pholders = ('?,' * len(attrs))[:-1]
+            sql = 'INSERT INTO task (' + columns +') VALUES(' + pholders + ')'
+            params = tuple(attrs.values()) 
+        else:
+            setclause = ','.join(map(lambda x: x + '=?', attrs.keys()))
+            sql = 'UPDATE task SET ' + setclause + ' WHERE id=?'
+            params = tuple(attrs.values() + [pk]) 
+        print(sql)
+        print(params)
+        if self.tags:
+            print(self.tags[0].__dict__)
+        cur.execute(sql, params) 
+        self._dbcon.commit()
+        if self.tags:
+            Tag().delall('task_id=?', (pk,))
+            Tag().saveall(self.tags)
 
     def delete(self):
         self.deleteById(self.getAttr('id'))
@@ -306,10 +329,31 @@ class Tag(Model):
         return self._attrs['task_id']
 
     def save(self):
-        pass
+        # TODO: same as in Task.save()
+        attrs = self._attrs
+        cols = ','.join(attrs.keys())
+        values = ('?,' * len(attrs))[:-1]
+        params = tuple(attrs.values()) 
+        sql = 'INSERT INTO tag (' + cols + ') VALUES(' + values + ')'
+        self._dbcon.cursor().execute(sql, params)
+        self._dbcon.commit()
         
-    def deleteAll(self, cond, params):
-        pass
+    def saveall(self, tags):
+        cur = self._dbcon.cursor()
+        sql = 'INSERT INTO tag (name,task_id) VALUES'
+        params = []
+        for tag in tags:
+            sql += '(?,?),'
+            params.extend([tag.name, tag.task_id])
+        print(sql)
+        print(params)
+        cur.execute(sql[:-1], tuple(params))
+        self._dbcon.commit()
+
+    def delall(self, cond, params):
+        sql = 'DELETE FROM tag WHERE ' + cond
+        self._dbcur.execute(sql, params)
+        self._dbcon.commit()
 
     def findAll(self, cond, params):
         sql = 'SELECT * FROM tag WHERE ' + cond

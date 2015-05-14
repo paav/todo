@@ -12,28 +12,25 @@ let s:old_cpo = &cpo
 set cpo&vim
 
 let s:BUFNAME_MAIN = 'TodoMain'
+let s:BUFNAME_EDIT = 'TodoEdit'
 let s:MAINWIN_W = 65
 let s:DIR_BASE = escape(expand('<sfile>:p:h:h'), '\')
 let s:DIR_LIB = s:DIR_BASE . '/lib'
 
 let s:FILE_DB = s:DIR_BASE . '/data/todo.db'
+let s:TAG_MARK = '#'
 
 command! Todo call s:Open()
 command! TodoToggle call s:Toggle()
 command! TodoClose call s:Close()
 
-let s:plugin_dir = escape(expand('<sfile>:p:h'), '\')
-let s:base_dir = escape(expand('<sfile>:p:h:h'), '\')
-let s:db = s:base_dir . '/data/todo.db'
 
 augroup todo
     autocmd!
     exe 'autocmd BufNewFile ' . s:BUFNAME_MAIN . ' call s:ApplyMainBufSettings()'
     exe 'autocmd BufNewFile ' . s:BUFNAME_MAIN . ' call s:ApplyMainBufMaps()'
-    autocmd BufEnter TodoAdd call s:TodoSettingsAdd()
-    autocmd BufWinLeave TodoAdd call s:TodoSave()
-    autocmd BufEnter TodoEdit call s:TodoSettingsAdd()
-    autocmd BufWinLeave TodoEdit call s:TodoSave()
+    exe 'autocmd BufNewFile ' . s:BUFNAME_EDIT . ' call s:ApplyEditBufSettings()'
+    exe 'autocmd BufWinLeave ' . s:BUFNAME_EDIT . ' call s:OnEditBufExit()'
 augroup END
 
 function! s:WinIsVisible(bufname) abort
@@ -150,6 +147,42 @@ function! s:TasksTableWidget._tstotimeformat(ts, format)
             \ . a:format . '")')
 endfunction
 
+function! s:TasksTableWidget.getcurtask() abort
+    let l:baselnum = self._base_lnum
+    let l:curlnum = line('.')
+
+    if l:curlnum < l:baselnum
+        return
+    endif
+
+    let self._curidx = l:curlnum - l:baselnum
+    return self._tasks[self._curidx]
+endfunction
+
+function! s:TasksTableWidget.getcuridx() abort
+    return self._curidx
+endfunction
+
+function! s:TasksTableWidget.update_task(idx, newtask) abort
+    let self._tasks[a:idx] = a:newtask
+    let l:lnum = self._idxtolnum(a:idx)
+    let l:newrow = self._tasktorow(a:newtask)
+
+    " TODO: same as in self.render()
+    let l:save_opt = &l:modifiable
+    let &l:modifiable = 1
+    call setline(l:lnum, l:newrow)
+    let &l:modifiable = l:save_opt
+endfunction
+
+function! s:TasksTableWidget._idxtolnum(idx) abort
+    if a:idx < 0 || a:idx > len(self._tasks) - 1
+        throw 'TasksTableWidget:wrongindex'
+    endif
+    return a:idx + self._base_lnum
+endfunction
+
+
 
 function! s:Open() abort
         " python reload(todo)
@@ -209,13 +242,6 @@ function! s:OpenMainWin() abort
     exe 'topleft ' . s:MAINWIN_W . 'vnew ' . s:BUFNAME_MAIN
 endfunction
 
-function! s:TodoOpen()
-    " TODO: replace with import
-    exe 'pyfile ' . s:plugin_dir . '/todo.py'
-    topleft 65vnew Todo 
-    python render_tasks()
-endfunction
-
 function! s:TodoClose()
     exe bufwinnr(bufnr('Todo')) . "wincmd w"
     quit
@@ -233,8 +259,69 @@ function! s:TodoDelete()
     python delete()
 endfunction
 
-function! s:TodoEdit()
-    python edit()
+" TODO: problem with write to curret dir access
+function! s:OpenEditWin() abort
+    silent exe 'new ' . s:BUFNAME_EDIT
+endfunction
+
+function! s:EditTask(task) abort
+    call s:OpenEditWin()
+    let old_undolevels = &undolevels
+    let &undolevels = -1
+
+    let @o = a:task.title . "\n"
+    let @o .= a:task.body . "\n"
+
+    let l:tagnames = []
+    for l:tag in a:task.tags
+        let l:tagnames = add(l:tagnames, l:tag.name)
+    endfor
+    let @o .= s:TAG_MARK . join(l:tagnames, ' ') 
+
+    put o | 1delete | write
+
+    let &undolevels = old_undolevels
+    let b:task = a:task
+endfunction
+
+function! s:OnEditBufExit()
+    " Delete buf file
+    call delete(s:BUFNAME_EDIT)
+    let l:task = s:UpdateTask(b:task)
+    echo l:task
+    python import vim
+    python newtask = todo.Task(vim.eval('l:task'), vim.eval('l:task.isnew'), vim.eval('l:task.tags')).save() 
+    " python print(newtask.__dict__)
+    let l:tasks_table =  getbufvar(s:BUFNAME_MAIN, 'tasks_table')
+    call s:GotoWin(s:BUFNAME_MAIN)
+    call l:tasks_table.update_task(l:tasks_table.getcuridx(), l:task)
+endfunction
+
+function! s:UpdateTask(task)
+    let l:lastlnum = line('$')
+    let a:task.title = getline(1)
+    let a:task.body = join(getline(2, l:lastlnum - 1), "\n")
+    let l:lastline = getline(l:lastlnum)
+
+    if l:lastline[0] == s:TAG_MARK
+        " [1:] doesn't work with multibyte
+        let a:task.tags = s:CreateTags(l:lastline[1:])
+    else
+        let a:task.body .= "\n" . lastline
+        let a:task.tags = []
+    endif
+
+    return a:task
+endfunction
+
+function! s:CreateTags(line)
+    let l:tags = []
+
+    for l:name in split(a:line)
+        let l:tags = add(l:tags, {'task_id': b:task.id, 'name': l:name})
+    endfor
+
+    return l:tags
 endfunction
 
 function! s:TodoIncPriority()
@@ -258,13 +345,13 @@ function! s:TodoApplyTagFilter()
 endfunction
 
 function! s:ApplyMainBufMaps()
-    nnoremap <script> <silent> <buffer> n :call <sid>TodoAdd()<cr>
-    nnoremap <script> <silent> <buffer> d :call <sid>TodoDelete()<cr>
-    nnoremap <script> <silent> <buffer> e :call <sid>TodoEdit()<cr>
-    nnoremap <script> <silent> <buffer> = :call <sid>TodoIncPriority()<cr>
-    nnoremap <script> <silent> <buffer> - :call <sid>TodoDecPriority()<cr>
-    nnoremap <script> <silent> <buffer> d :call <sid>TodoFinish()<cr>
-    nnoremap <script> <silent> <buffer> f :call <sid>TodoApplyTagFilter()<cr>
+    nnoremap <silent> <buffer> n :call <SID>TodoAdd()<CR>
+    nnoremap <silent> <buffer> d :call <SID>TodoDelete()<CR>
+    nnoremap  <buffer> e :call <SID>EditTask(b:tasks_table.getcurtask())<CR>
+    nnoremap <silent> <buffer> <nowait>  + :call <SID>TodoIncPriority()<CR>
+    nnoremap <silent> <buffer> - :call <SID>TodoDecPriority()<CR>
+    nnoremap <silent> <buffer> d :call <SID>TodoFinish()<CR>
+    nnoremap <silent> <buffer> f :call <SID>TodoApplyTagFilter()<CR>
     nnoremap <silent> <buffer> ? :call b:help_widget.toggle()<CR>
 endfunction
 
@@ -280,10 +367,11 @@ function! s:ApplyMainBufSettings()
     setlocal concealcursor=nc
 endfunction
 
-function! s:TodoSettingsAdd()
+function! s:ApplyEditBufSettings()
     setlocal noswapfile
     setlocal nonumber
     setlocal nobuflisted
+    setlocal bufhidden=wipe
 endfunction
 
 let &cpo = s:old_cpo
