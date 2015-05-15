@@ -139,7 +139,6 @@ class Task(Model):
         attrs = self.attrs
         pk = attrs['id']
         del attrs['id']
-        # pprint(self.__dict__)
         if self.isnew:
             return
             columns = ','.join(attrs.keys())
@@ -150,13 +149,15 @@ class Task(Model):
             setclause = ','.join(map(lambda x: x + '=?', attrs.keys()))
             sql = 'UPDATE task SET ' + setclause + ' WHERE id=?'
             params = tuple(attrs.values() + [pk]) 
-        print(sql)
-        print(params)
-        if self.tags:
-            print(self.tags[0].__dict__)
         cur.execute(sql, params) 
         self._dbcon.commit()
+        if self.isnew:
+            self._isnew = False
+            pk = cur.lastrowid
+            self._attrs['id'] = pk
         if self.tags:
+            for tag in self.tags:
+                tag.task_id = pk
             Tag().delall('task_id=?', (pk,))
             Tag().saveall(self.tags)
 
@@ -314,11 +315,13 @@ class Tag(Model):
     def __init__(self, attrs={}):
         super(Tag, self).__init__()
         self._attrs = {
-            'id':       None,
             'name':     '',
             'task_id':  None,
         }
-        self._attrs.update(attrs)
+        # TODO: make in pythonic way
+        for k, v in self._attrs.iteritems():
+            if k in attrs:
+                self._attrs[k] = attrs[k]
 
     @property
     def name(self):
@@ -327,6 +330,10 @@ class Tag(Model):
     @property
     def task_id(self):
         return self._attrs['task_id']
+
+    @task_id.setter
+    def task_id(self, value):
+        self._attrs['task_id'] = value
 
     def save(self):
         # TODO: same as in Task.save()
@@ -345,8 +352,6 @@ class Tag(Model):
         for tag in tags:
             sql += '(?,?),'
             params.extend([tag.name, tag.task_id])
-        print(sql)
-        print(params)
         cur.execute(sql[:-1], tuple(params))
         self._dbcon.commit()
 

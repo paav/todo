@@ -185,9 +185,10 @@ endfunction
 
 
 function! s:Open() abort
-        " python reload(todo)
+        python reload(todo)
     " if !exists('g:todo_py_loaded')
         python import sys
+        python import vim
         exe 'python sys.path.append("' . s:DIR_LIB . '")'
         python import todo 
         python from todo import tasklist
@@ -266,49 +267,85 @@ endfunction
 
 function! s:EditTask(task) abort
     call s:OpenEditWin()
-    let old_undolevels = &undolevels
-    let &undolevels = -1
+    let old_undolevels = &l:undolevels
+    let &l:undolevels = -1
 
-    let @o = a:task.title . "\n"
-    let @o .= a:task.body . "\n"
+        let @o = a:task.title
 
-    let l:tagnames = []
-    for l:tag in a:task.tags
-        let l:tagnames = add(l:tagnames, l:tag.name)
-    endfor
-    let @o .= s:TAG_MARK . join(l:tagnames, ' ') 
+        if a:task.body != ''
+            let @o .= "\n" . a:task.body
+        endif
 
-    put o | 1delete | write
+        if !empty(a:task.tags)
+            let l:tagnames = []
+            for l:tag in a:task.tags
+                let l:tagnames = add(l:tagnames, l:tag.name)
+            endfor
+            let @o .= "\n" . s:TAG_MARK . join(l:tagnames, ' ') 
+        endif
 
-    let &undolevels = old_undolevels
+        put o | 1delete | write
+
+        let &l:undolevels = old_undolevels
+
     let b:task = a:task
 endfunction
 
 function! s:OnEditBufExit()
+    if &modified
+        edit! %
+    endif
+
+    let l:task = s:UpdateTask(copy(b:task))
+
     " Delete buf file
     call delete(s:BUFNAME_EDIT)
-    let l:task = s:UpdateTask(b:task)
-    echo l:task
-    python import vim
-    python newtask = todo.Task(vim.eval('l:task'), vim.eval('l:task.isnew'), vim.eval('l:task.tags')).save() 
-    " python print(newtask.__dict__)
+
+    if empty(l:task) || l:task == b:task
+        return
+    endif
+
+    python newtask = todo.Task(vim.eval('l:task'), vim.eval('l:task.isnew'),
+                              \vim.eval('l:task.tags'))
+    python newtask.save()
+
     let l:tasks_table =  getbufvar(s:BUFNAME_MAIN, 'tasks_table')
     call s:GotoWin(s:BUFNAME_MAIN)
+
     call l:tasks_table.update_task(l:tasks_table.getcuridx(), l:task)
 endfunction
 
 function! s:UpdateTask(task)
-    let l:lastlnum = line('$')
-    let a:task.title = getline(1)
-    let a:task.body = join(getline(2, l:lastlnum - 1), "\n")
-    let l:lastline = getline(l:lastlnum)
+    silent 1,$g/^\s*$/d
 
-    if l:lastline[0] == s:TAG_MARK
-        " [1:] doesn't work with multibyte
-        let a:task.tags = s:CreateTags(l:lastline[1:])
+    let l:firstline = getline(1)
+    let l:lastlnum = line('$')
+
+    if l:lastlnum == 1 && l:firstline == ''
+        return {}
+    endif
+
+    let a:task.title = getline(1)
+
+    if l:lastlnum > 1
+        let l:taglinepat = '\v^' . s:TAG_MARK . '(\w+\s*)+'
+        let l:lastline = getline(l:lastlnum)
+
+        if l:lastline =~ l:taglinepat
+            " Delete tag line
+            $d
+            let l:lastlnum -= 1
+            let a:task.tags = s:CreateTags(l:lastline[1:])
+        endif
     else
-        let a:task.body .= "\n" . lastline
         let a:task.tags = []
+    endif
+
+    if l:lastlnum > 1
+        let l:bodylines = getline(2, l:lastlnum)
+        let a:task.body = join(l:bodylines, "\n") 
+    else
+        let a:task.body = ''
     endif
 
     return a:task
