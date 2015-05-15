@@ -57,6 +57,14 @@ class Task(Model):
                 self._attrs[k] = attrs[k]
         self._isnew = isnew
 
+    def todict(self):
+        dic = self._attrs
+        dic['isnew'] = self._isnew
+        dic['tags'] = []
+        for tag in self._tags:
+            dic['tags'].append(tag.todict())
+        return dic
+
     @property
     def isnew(self):
         return self._isnew
@@ -140,10 +148,9 @@ class Task(Model):
         pk = attrs['id']
         del attrs['id']
         if self.isnew:
-            return
-            columns = ','.join(attrs.keys())
-            pholders = ('?,' * len(attrs))[:-1]
-            sql = 'INSERT INTO task (' + columns +') VALUES(' + pholders + ')'
+            cols = ','.join(attrs.keys())
+            values = ('?,' * len(attrs))[:-1]
+            sql = 'INSERT INTO task (' + cols +') VALUES(' + values + ')'
             params = tuple(attrs.values()) 
         else:
             setclause = ','.join(map(lambda x: x + '=?', attrs.keys()))
@@ -334,6 +341,9 @@ class Tag(Model):
     @task_id.setter
     def task_id(self, value):
         self._attrs['task_id'] = value
+
+    def todict(self):
+        return self._attrs
 
     def save(self):
         # TODO: same as in Task.save()

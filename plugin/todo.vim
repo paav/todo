@@ -16,7 +16,6 @@ let s:BUFNAME_EDIT = 'TodoEdit'
 let s:MAINWIN_W = 65
 let s:DIR_BASE = escape(expand('<sfile>:p:h:h'), '\')
 let s:DIR_LIB = s:DIR_BASE . '/lib'
-
 let s:FILE_DB = s:DIR_BASE . '/data/todo.db'
 let s:TAG_MARK = '#'
 
@@ -176,13 +175,23 @@ function! s:TasksTableWidget.update_task(idx, newtask) abort
 endfunction
 
 function! s:TasksTableWidget._idxtolnum(idx) abort
-    if a:idx < 0 || a:idx > len(self._tasks) - 1
+    let l:maxidx = len(self._tasks) - 1
+
+    if a:idx < -l:maxidx - 1 || a:idx > l:maxidx
         throw 'TasksTableWidget:wrongindex'
     endif
-    return a:idx + self._base_lnum
+
+    return self._base_lnum + (a:idx > 0 ? a:idx : l:maxidx + 1 + a:idx)
 endfunction
 
-
+function! s:TasksTableWidget.add_task(task) abort
+    call add(self._tasks, a:task)
+    let l:newlnum = self._idxtolnum(-1)
+    let l:save_opt = &l:modifiable
+    let &l:modifiable = 1
+    call setline(l:newlnum, self._tasktorow(a:task))
+    let &l:modifiable = l:save_opt
+endfunction
 
 function! s:Open() abort
         python reload(todo)
@@ -270,6 +279,7 @@ function! s:EditTask(task) abort
     let old_undolevels = &l:undolevels
     let &l:undolevels = -1
 
+    if !a:task.isnew
         let @o = a:task.title
 
         if a:task.body != ''
@@ -287,6 +297,7 @@ function! s:EditTask(task) abort
         put o | 1delete | write
 
         let &l:undolevels = old_undolevels
+    endif
 
     let b:task = a:task
 endfunction
@@ -312,7 +323,14 @@ function! s:OnEditBufExit()
     let l:tasks_table =  getbufvar(s:BUFNAME_MAIN, 'tasks_table')
     call s:GotoWin(s:BUFNAME_MAIN)
 
-    call l:tasks_table.update_task(l:tasks_table.getcuridx(), l:task)
+    if l:task.isnew
+        python from pprint import pprint
+        python pprint(newtask.__dict__)
+        python pprint(newtask.todict())
+        call l:tasks_table.add_task(pyeval('newtask.todict()'))
+    else
+        call l:tasks_table.update_task(l:tasks_table.getcuridx(), l:task)
+    endif
 endfunction
 
 function! s:UpdateTask(task)
@@ -353,9 +371,10 @@ endfunction
 
 function! s:CreateTags(line)
     let l:tags = []
-
+    let l:taskid = b:task.isnew ? '' : b:task.id
+    
     for l:name in split(a:line)
-        let l:tags = add(l:tags, {'task_id': b:task.id, 'name': l:name})
+        let l:tags = add(l:tags, {'task_id': l:taskid, 'name': l:name})
     endfor
 
     return l:tags
@@ -382,7 +401,7 @@ function! s:TodoApplyTagFilter()
 endfunction
 
 function! s:ApplyMainBufMaps()
-    nnoremap <silent> <buffer> n :call <SID>TodoAdd()<CR>
+    nnoremap <silent> <buffer> n :call <SID>EditTask({'isnew': 1})<CR>
     nnoremap <silent> <buffer> d :call <SID>TodoDelete()<CR>
     nnoremap  <buffer> e :call <SID>EditTask(b:tasks_table.getcurtask())<CR>
     nnoremap <silent> <buffer> <nowait>  + :call <SID>TodoIncPriority()<CR>
