@@ -351,6 +351,9 @@ function! s:UpdateTask(task)
 
     let a:task.title = getline(1)
 
+    let l:tags = []
+    let l:body = ''
+
     if l:lastlnum > 1
         let l:taglinepat = '\v^' . s:TAG_MARK . '(\w+\s*)+'
         let l:lastline = getline(l:lastlnum)
@@ -359,18 +362,17 @@ function! s:UpdateTask(task)
             " Delete tag line
             $d
             let l:lastlnum -= 1
-            let a:task.tags = s:CreateTags(l:lastline[1:])
+            let l:tags = s:CreateTags(l:lastline[1:])
         endif
-    else
-        let a:task.tags = []
     endif
 
     if l:lastlnum > 1
         let l:bodylines = getline(2, l:lastlnum)
-        let a:task.body = join(l:bodylines, "\n") 
-    else
-        let a:task.body = ''
+        let l:body = join(l:bodylines, "\n") 
     endif
+
+    let a:task.body = l:body
+    let a:task.tags = l:tags
 
     return a:task
 endfunction
@@ -419,7 +421,7 @@ endfunction
 function! s:ApplyMainBufMaps()
     nnoremap <silent> <buffer> n :call <SID>EditTask({'isnew': 1})<CR>
     nnoremap <silent> <buffer> <nowait> gd :call <SID>DeleteTask(b:tasks_table.getcurtask())<CR>
-    nnoremap  <buffer> e :call <SID>EditTask(b:tasks_table.getcurtask())<CR>
+    nnoremap <buffer> e :call <SID>EditTask(b:tasks_table.getcurtask())<CR>
     nnoremap <silent> <buffer> <nowait>  + :call <SID>TodoIncPriority()<CR>
     nnoremap <silent> <buffer> - :call <SID>TodoDecPriority()<CR>
     nnoremap <silent> <buffer> x :call <SID>TodoFinish()<CR>
