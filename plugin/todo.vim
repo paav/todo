@@ -193,6 +193,23 @@ function! s:TasksTableWidget.add_task(task) abort
     let &l:modifiable = l:save_opt
 endfunction
 
+function! s:TasksTableWidget.deltask(...) abort
+    if a:0 > 1
+        throw 'TasksTableWidget:toomanyargs'
+    endif
+
+    let l:idx = exists('a:1') ? a:1 : self._curidx
+    let l:lnum = self._idxtolnum(l:idx)
+
+    unlet self._tasks[l:idx]
+
+    " TODO: repeated code
+    let l:save_opt = &l:modifiable
+    let &l:modifiable = 1
+    exe l:lnum . 'delete'
+    let &l:modifiable = l:save_opt
+endfunction
+
 function! s:Open() abort
         python reload(todo)
     " if !exists('g:todo_py_loaded')
@@ -201,6 +218,7 @@ function! s:Open() abort
         exe 'python sys.path.append("' . s:DIR_LIB . '")'
         python import todo 
         python from todo import tasklist
+        python from todo import Task
         python from datetime import datetime
         exe 'python todo.setdb("' . s:FILE_DB . '")'
         let g:todo_py_loaded = 1
@@ -255,18 +273,6 @@ endfunction
 function! s:TodoClose()
     exe bufwinnr(bufnr('Todo')) . "wincmd w"
     quit
-endfunction
-
-function! s:TodoAdd()
-    python add()
-endfunction
-
-function! s:TodoSave()
-    python save()
-endfunction
-
-function! s:TodoDelete()
-    python delete()
 endfunction
 
 " TODO: problem with write to curret dir access
@@ -380,6 +386,20 @@ function! s:CreateTags(line)
     return l:tags
 endfunction
 
+function! s:DeleteTask(task) abort
+    let l:YES = 'yes'
+    let l:PROMPT = "Type '" . l:YES . "' to delete task at cursor: "
+    let l:answer = input(l:PROMPT, '')
+    redraw | echo ''
+
+    if l:answer !=# l:YES
+        return
+    endif
+
+    exe 'python Task().delbyid(' . a:task.id . ')'
+    call b:tasks_table.deltask() 
+endfunction
+
 function! s:TodoIncPriority()
     python priority_add(1)
 endfunction
@@ -392,21 +412,17 @@ function! s:TodoRefresh()
     python refresh()
 endfunction
 
-function! s:TodoFinish()
-    python finish()
-endfunction
-
 function! s:TodoApplyTagFilter()
     python apply_tag_filter()
 endfunction
 
 function! s:ApplyMainBufMaps()
     nnoremap <silent> <buffer> n :call <SID>EditTask({'isnew': 1})<CR>
-    nnoremap <silent> <buffer> d :call <SID>TodoDelete()<CR>
+    nnoremap <silent> <buffer> <nowait> gd :call <SID>DeleteTask(b:tasks_table.getcurtask())<CR>
     nnoremap  <buffer> e :call <SID>EditTask(b:tasks_table.getcurtask())<CR>
     nnoremap <silent> <buffer> <nowait>  + :call <SID>TodoIncPriority()<CR>
     nnoremap <silent> <buffer> - :call <SID>TodoDecPriority()<CR>
-    nnoremap <silent> <buffer> d :call <SID>TodoFinish()<CR>
+    nnoremap <silent> <buffer> x :call <SID>TodoFinish()<CR>
     nnoremap <silent> <buffer> f :call <SID>TodoApplyTagFilter()<CR>
     nnoremap <silent> <buffer> ? :call b:help_widget.toggle()<CR>
 endfunction
