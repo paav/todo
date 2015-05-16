@@ -103,13 +103,28 @@ function! s:TasksTableWidget.create() abort
     return copy(self)
 endfunction
 
+function! s:TasksTableWidget.update() abort
+    let l:lasttask = self._tasks[self._curidx]
+    let self._tasks = pyeval('tasklist.gettasks()')
+
+    " TODO: move to separate function
+    let l:lastlnum = self._baselnum + len(self._tasks) - 1
+    " TODO: repeated code
+    let l:save_opt = &l:modifiable
+    let &l:modifiable = 1
+    exe self._baselnum . ',' . l:lastlnum . 'delete'
+    call self._renderBody()
+    let &l:modifiable = l:save_opt
+
+    call cursor(self._gettasklnum(l:lasttask), 0)
+endfunction
+
 function! s:TasksTableWidget.render() abort
     let l:save_opt = &l:modifiable
     let &l:modifiable = 1
     " exe a:lnum . ',$delete'
 
     call self._renderHead()
-
     call self._renderBody()
 
     let self._isvisible = 1
@@ -120,10 +135,10 @@ function! s:TasksTableWidget._renderHead() abort
     let @o = printf('%-10s%-32s%-10s%-10s', 'Created', 'Title', 'Tag', 'Pri') 
     let @o .= "\n" . repeat('-', 60)
     put o
+    let self._baselnum = line('.') + 1
 endfunction
 
 function! s:TasksTableWidget._renderBody() abort
-    let self._base_lnum = line('.') + 1
     for task in self._tasks
         call setline(line('.') + 1, self._tasktorow(task))
         call cursor(line('.') + 1, col('.'))
@@ -147,7 +162,7 @@ function! s:TasksTableWidget._tstotimeformat(ts, format)
 endfunction
 
 function! s:TasksTableWidget.getcurtask() abort
-    let l:baselnum = self._base_lnum
+    let l:baselnum = self._baselnum
     let l:curlnum = line('.')
 
     if l:curlnum < l:baselnum
@@ -155,11 +170,26 @@ function! s:TasksTableWidget.getcurtask() abort
     endif
 
     let self._curidx = l:curlnum - l:baselnum
+
     return self._tasks[self._curidx]
 endfunction
 
 function! s:TasksTableWidget.getcuridx() abort
     return self._curidx
+endfunction
+
+function! s:TasksTableWidget._gettasklnum(task) abort
+    let l:i = 0
+
+    for l:t in self._tasks 
+        if l:t.id == a:task.id
+            return self._idxtolnum(l:i)
+        endif
+
+        let l:i += 1
+    endfor
+
+    return -1
 endfunction
 
 function! s:TasksTableWidget.update_task(idx, newtask) abort
@@ -181,7 +211,7 @@ function! s:TasksTableWidget._idxtolnum(idx) abort
         throw 'TasksTableWidget:wrongindex'
     endif
 
-    return self._base_lnum + (a:idx > 0 ? a:idx : l:maxidx + 1 + a:idx)
+    return self._baselnum + (a:idx > 0 ? a:idx : l:maxidx + 1 + a:idx)
 endfunction
 
 function! s:TasksTableWidget.add_task(task) abort
@@ -402,12 +432,24 @@ function! s:DeleteTask(task) abort
     call b:tasks_table.deltask() 
 endfunction
 
-function! s:TodoIncPriority()
-    python priority_add(1)
+function! s:_ChangePriorityBy(value) abort
+    let l:task = b:tasks_table.getcurtask() 
+
+    " TODO: repeated code
+    python newtask = todo.Task(vim.eval('l:task'), vim.eval('l:task.isnew'),
+                              \vim.eval('l:task.tags'))
+    python newtask.changepri(vim.eval('a:value'))
+    python newtask.save()
+
+    call b:tasks_table.update()
 endfunction
 
-function! s:TodoDecPriority()
-    python priority_add(-1)
+function! s:RaisePriority() abort
+    call s:_ChangePriorityBy(1)
+endfunction
+
+function! s:DropPriority() abort
+    call s:_ChangePriorityBy(-1)
 endfunction
 
 function! s:TodoRefresh()
@@ -422,8 +464,8 @@ function! s:ApplyMainBufMaps()
     nnoremap <silent> <buffer> n :call <SID>EditTask({'isnew': 1})<CR>
     nnoremap <silent> <buffer> <nowait> gd :call <SID>DeleteTask(b:tasks_table.getcurtask())<CR>
     nnoremap <buffer> e :call <SID>EditTask(b:tasks_table.getcurtask())<CR>
-    nnoremap <silent> <buffer> <nowait>  + :call <SID>TodoIncPriority()<CR>
-    nnoremap <silent> <buffer> - :call <SID>TodoDecPriority()<CR>
+    nnoremap <silent> <buffer> <nowait> = :call <SID>RaisePriority()<CR>
+    nnoremap <silent> <buffer> - :call <SID>DropPriority()<CR>
     nnoremap <silent> <buffer> x :call <SID>TodoFinish()<CR>
     nnoremap <silent> <buffer> f :call <SID>TodoApplyTagFilter()<CR>
     nnoremap <silent> <buffer> ? :call b:help_widget.toggle()<CR>

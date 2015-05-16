@@ -171,13 +171,16 @@ class Task(Model):
     def delete(self):
         self.deleteById(self.getAttr('id'))
 
+    def changepri(self, value):
+        # TODO: why priority is a str?
+        self._attrs['priority'] = max(0, int(self._attrs['priority']) + int(value))
+
     def delbyid(self, id):
         cur = self._dbcon.cursor()
         sql = 'DELETE FROM task WHERE id=?'
         cur.execute(sql, (id,))
         self._dbcon.commit()
         Tag().delall('task_id=?', (id,))
-        return True
 
     def getAttr(self, name):
         return self._attrs[name]
