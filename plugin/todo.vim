@@ -211,7 +211,7 @@ function! s:TasksTableWidget._idxtolnum(idx) abort
         throw 'TasksTableWidget:wrongindex'
     endif
 
-    return self._baselnum + (a:idx > 0 ? a:idx : l:maxidx + 1 + a:idx)
+    return self._baselnum + (a:idx < 0 ? l:maxidx + 1 + a:idx : a:idx)
 endfunction
 
 function! s:TasksTableWidget.add_task(task) abort
