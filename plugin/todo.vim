@@ -432,24 +432,21 @@ function! s:DeleteTask(task) abort
     call b:tasks_table.deltask() 
 endfunction
 
-function! s:_ChangePriorityBy(value) abort
+function! s:ChangePriority(value) abort
     let l:task = b:tasks_table.getcurtask() 
 
     " TODO: repeated code
     python newtask = todo.Task(vim.eval('l:task'), vim.eval('l:task.isnew'),
                               \vim.eval('l:task.tags'))
-    python newtask.changepri(vim.eval('a:value'))
+    python newtask.priority = vim.eval('a:value')
     python newtask.save()
 
     call b:tasks_table.update()
 endfunction
 
-function! s:RaisePriority() abort
-    call s:_ChangePriorityBy(1)
-endfunction
-
-function! s:DropPriority() abort
-    call s:_ChangePriorityBy(-1)
+function! s:SetPriority() abort
+    let l:pri = input('Set priority to: ')
+    call s:ChangePriority(l:pri)
 endfunction
 
 function! s:TodoRefresh()
@@ -464,8 +461,9 @@ function! s:ApplyMainBufMaps()
     nnoremap <silent> <buffer> n :call <SID>EditTask({'isnew': 1})<CR>
     nnoremap <silent> <buffer> <nowait> gd :call <SID>DeleteTask(b:tasks_table.getcurtask())<CR>
     nnoremap <buffer> e :call <SID>EditTask(b:tasks_table.getcurtask())<CR>
-    nnoremap <silent> <buffer> <nowait> = :call <SID>RaisePriority()<CR>
-    nnoremap <silent> <buffer> - :call <SID>DropPriority()<CR>
+    nnoremap <silent> <buffer> <nowait> = :call <SID>ChangePriority('+1')<CR>
+    nnoremap <silent> <buffer> - :call <SID>ChangePriority(-1)<CR>
+    nnoremap <silent> <buffer> gp :call <SID>SetPriority()<CR>
     nnoremap <silent> <buffer> x :call <SID>TodoFinish()<CR>
     nnoremap <silent> <buffer> f :call <SID>TodoApplyTagFilter()<CR>
     nnoremap <silent> <buffer> ? :call b:help_widget.toggle()<CR>

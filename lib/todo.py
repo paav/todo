@@ -6,7 +6,6 @@ import time
 # TODO: drop globals
 DBFILE = None
 
-
 def setdb(dbfile):
     global DBFILE
     DBFILE = dbfile
@@ -171,9 +170,18 @@ class Task(Model):
     def delete(self):
         self.deleteById(self.getAttr('id'))
 
-    def changepri(self, value):
+    @property
+    def priority(self):
+        return self._attrs['priority']
+
+    @priority.setter
+    def priority(self, value):
         # TODO: why priority is a str?
-        self._attrs['priority'] = max(0, int(self._attrs['priority']) + int(value))
+        curpri = int(self._attrs['priority'])
+        if isinstance(value, basestring):
+            value = (curpri + int(value) if value[0] in ['+', '-']
+                else int(value))
+        self._attrs['priority'] = max(0, value)
 
     def delbyid(self, id):
         cur = self._dbcon.cursor()
