@@ -65,11 +65,19 @@ function! s:HelpWidget.render() abort
     let &l:modifiable = 1
 
     if !empty(self._prevtext) 
+        " Only del command moves cursor, append -- doesn't
+        let l:oldpos = getcurpos()
+
         let prev_text_len = len(self._prevtext)
         exe '1,' . prev_text_len . '$delete'
+
+        " Correct lnum after deletion
+        let l:oldpos[1] -= prev_text_len
+        call setpos('.', l:oldpos)
     endif
 
     call append(0, self._curtext)
+
     let self._isvisible = 1
     let &l:modifiable = l:save_opt
 endfunction
