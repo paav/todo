@@ -44,7 +44,7 @@ class Task(Model):
         if not isinstance(isnew, bool):
             isnew = bool(int(isnew))
         self._attrs = {
-            'id':        None,
+            'id':        '',
             'title':     '',
             'create_date': time.time(),
             'body':      '',
@@ -57,12 +57,10 @@ class Task(Model):
         self._isnew = isnew
 
     def todict(self):
-        dic = self._attrs
-        dic['isnew'] = self._isnew
-        dic['tags'] = []
-        for tag in self._tags:
-            dic['tags'].append(tag.todict())
-        return dic
+        vdict = self._attrs
+        vdict['isnew'] = self._isnew
+        vdict['tags'] = [ tag.todict() for tag in self._tags ]
+        return vdict
 
     @property
     def isnew(self):
@@ -127,6 +125,9 @@ class Task(Model):
         cur.execute(sql, (id,))
         task = Task(Task.row2attrs(cur.fetchone()), isnew=False)
         return task
+
+    def gettagnames(self):
+        return [ tag.name for tag in self._tags ]
 
     def tag_names(self):
         sql = 'SELECT * FROM tag WHERE task_id=?'
@@ -210,18 +211,25 @@ class Task(Model):
         self.dbconn.commit()
 
 
-class TaskList:
+class TaskList(object):
     def __init__(self):
         self.cond = ''
         self.params = ()
         self.last_task_at_cursor = None
         self.tbody_1strow_lnum = 1
         self.filter_by_tags = []
+        self._tasks = []
+        self._filter = {}
         # self.populate() 
 
+    def load(self):
+        self._tasks = Task().findAll()
+
+    # TODO: change name
     def gettasks(self):
+        self._tasks = Task().findAll()
         tasks = []
-        for task in Task().findAll():
+        for task in self._tasks: 
             attrs = self._convnone(task.attrs)
             tags = []
             for tag in task.tags: 
@@ -230,6 +238,29 @@ class TaskList:
             attrs['isnew'] = task.isnew
             tasks.append(attrs)
         return tasks
+
+    @property
+    def filter(self):
+        return self._filter
+
+    @filter.setter
+    def filter(self, value):
+        self._filter = value
+
+    def filterby_tagnames(self, tasks, tagnames):
+        return [ task for task in tasks if set(tagnames) <= set(task.gettagnames()) ]
+
+    def tovimlist(self):
+        tasks = self._tasks
+        if self._filter:
+            tasks = tasks[:]
+            for k, v in self._filter.iteritems():
+                tasks = getattr(self, 'filterby_' + k)(tasks, v)
+        return self._createvimlist(tasks)
+
+    @staticmethod
+    def _createvimlist(tasks):
+        return [ task.todict() for task in tasks ]
 
     @staticmethod
     def _convnone(attrs):
@@ -335,7 +366,7 @@ class Tag(Model):
         super(Tag, self).__init__()
         self._attrs = {
             'name':     '',
-            'task_id':  None,
+            'task_id':  '',
         }
         # TODO: make in pythonic way
         for k, v in self._attrs.iteritems():

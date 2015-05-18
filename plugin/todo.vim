@@ -107,24 +107,38 @@ let s:TasksTableWidget = {}
 
 function! s:TasksTableWidget.create() abort
     let self._isvisible = 0
-    let self._tasks = pyeval('tasklist.gettasks()')
+    python tasklist.load()
+    let self._tasks = pyeval('tasklist.tovimlist()')
+    let self._curidx = 0
     return copy(self)
 endfunction
 
-function! s:TasksTableWidget.update() abort
-    let l:lasttask = self._tasks[self._curidx]
-    let self._tasks = pyeval('tasklist.gettasks()')
+function! s:TasksTableWidget.update(...) abort
+    let l:ishard = !exists('a:1') ? 0 : a:1
+    let l:lasttask = self._tasks[self.getcuridx2()]
+
+    if l:ishard
+        python tasklist.load()
+    endif
+
+    let self._tasks = pyeval('tasklist.tovimlist()')
 
     " TODO: move to separate function
     let l:lastlnum = self._baselnum + len(self._tasks) - 1
     " TODO: repeated code
     let l:save_opt = &l:modifiable
     let &l:modifiable = 1
-    exe self._baselnum . ',' . l:lastlnum . 'delete'
+    exe self._baselnum . ',' . '$' . 'delete'
     call self._renderBody()
     let &l:modifiable = l:save_opt
+    
+    let l:curlnum = self._gettasklnum(l:lasttask)
+    call cursor(l:curlnum == -1 ? self._baselnum : l:curlnum, 0)
+endfunction
 
-    call cursor(self._gettasklnum(l:lasttask), 0)
+function! s:TasksTableWidget.filterbytags(tagnames) abort
+    python tasklist.filter = { 'tagnames': vim.eval('a:tagnames') }
+    call self.update()
 endfunction
 
 function! s:TasksTableWidget.render() abort
@@ -184,6 +198,10 @@ endfunction
 
 function! s:TasksTableWidget.getcuridx() abort
     return self._curidx
+endfunction
+
+function! s:TasksTableWidget.getcuridx2() abort
+    return line('.') - self._baselnum 
 endfunction
 
 function! s:TasksTableWidget._gettasklnum(task) abort
@@ -449,7 +467,7 @@ function! s:ChangePriority(value) abort
     python newtask.priority = vim.eval('a:value')
     python newtask.save()
 
-    call b:tasks_table.update()
+    call b:tasks_table.update(1)
 endfunction
 
 function! s:SetPriority() abort
@@ -457,12 +475,9 @@ function! s:SetPriority() abort
     call s:ChangePriority(l:pri)
 endfunction
 
-function! s:TodoRefresh()
-    python refresh()
-endfunction
-
-function! s:TodoApplyTagFilter()
-    python apply_tag_filter()
+function! s:ApplyTagFilter()
+    let l:tagnames = split(input('Filter by tags: '))
+    call b:tasks_table.filterbytags(l:tagnames)
 endfunction
 
 function! s:ApplyMainBufMaps()
@@ -473,7 +488,7 @@ function! s:ApplyMainBufMaps()
     nnoremap <silent> <buffer> - :call <SID>ChangePriority(-1)<CR>
     nnoremap <silent> <buffer> gp :call <SID>SetPriority()<CR>
     nnoremap <silent> <buffer> x :call <SID>TodoFinish()<CR>
-    nnoremap <silent> <buffer> f :call <SID>TodoApplyTagFilter()<CR>
+    nnoremap <silent> <buffer> gf :call <SID>ApplyTagFilter()<CR>
     nnoremap <silent> <buffer> ? :call b:help_widget.toggle()<CR>
 endfunction
 
