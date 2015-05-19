@@ -218,18 +218,6 @@ function! s:TasksTableWidget._gettasklnum(task) abort
     return -1
 endfunction
 
-function! s:TasksTableWidget.update_task(idx, newtask) abort
-    let self._tasks[a:idx] = a:newtask
-    let l:lnum = self._idxtolnum(a:idx)
-    let l:newrow = self._tasktorow(a:newtask)
-
-    " TODO: same as in self.render()
-    let l:save_opt = &l:modifiable
-    let &l:modifiable = 1
-    call setline(l:lnum, l:newrow)
-    let &l:modifiable = l:save_opt
-endfunction
-
 function! s:TasksTableWidget._idxtolnum(idx) abort
     let l:maxidx = len(self._tasks) - 1
 
@@ -238,15 +226,6 @@ function! s:TasksTableWidget._idxtolnum(idx) abort
     endif
 
     return self._baselnum + (a:idx < 0 ? l:maxidx + 1 + a:idx : a:idx)
-endfunction
-
-function! s:TasksTableWidget.add_task(task) abort
-    call add(self._tasks, a:task)
-    let l:newlnum = self._idxtolnum(-1)
-    let l:save_opt = &l:modifiable
-    let &l:modifiable = 1
-    call setline(l:newlnum, self._tasktorow(a:task))
-    let &l:modifiable = l:save_opt
 endfunction
 
 function! s:TasksTableWidget.deltask(...) abort
@@ -275,6 +254,7 @@ function! s:Open() abort
         python import todo 
         python from todo import tasklist
         python from todo import Task
+        python from todo import Tag
         python from datetime import datetime
         exe 'python todo.setdb("' . s:FILE_DB . '")'
         let g:todo_py_loaded = 1
@@ -378,21 +358,26 @@ function! s:OnEditBufExit()
         return
     endif
 
-    python newtask = todo.Task(vim.eval('l:task'), vim.eval('l:task.isnew'),
-                              \vim.eval('l:task.tags'))
-    python newtask.save()
-
     let l:tasks_table =  getbufvar(s:BUFNAME_MAIN, 'tasks_table')
-    call s:GotoWin(s:BUFNAME_MAIN)
+    let l:attrs = {'title': l:task.title, 'body': l:task.body}
+    python attrslist = vim.eval('l:task.tags')
+    python tags = Tag().createmany(attrslist) if attrslist else []
 
     if l:task.isnew
-        python from pprint import pprint
-        python pprint(newtask.__dict__)
-        python pprint(newtask.todict())
-        call l:tasks_table.add_task(pyeval('newtask.todict()'))
+        python task = Task(vim.eval('l:task'))
+        python tasklist.add(task)
     else
-        call l:tasks_table.update_task(l:tasks_table.getcuridx(), l:task)
+        python task = tasklist.getbyid(int(vim.eval('l:task.id')))
+        " Link to task in tasklist
+        python task.attrs = vim.eval('l:attrs')
     endif
+
+    python task.tags = tags
+    python task.save()
+
+    call s:GotoWin(s:BUFNAME_MAIN)
+
+    call b:tasks_table.update()
 endfunction
 
 function! s:UpdateTask(task)

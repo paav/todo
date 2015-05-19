@@ -17,13 +17,22 @@ class Model(object):
         self._dbcon.row_factory = sqlite3.Row
         self._dbcur = self._dbcon.cursor()
 
+    def __repr__(self):
+        out = '\n<Tag object>\n'
+        for k, v in self._attrs.iteritems():
+            out += '  %-10s%s\n' % (k + ':', v) 
+        return out
+
     @property
     def attrs(self):
         return self._attrs
 
     @attrs.setter
-    def attrs(self, value):
-        self._attrs.update(value)
+    def attrs(self, attrs):
+        # TODO: make in pythonic way
+        for k, v in attrs.iteritems():
+            if k in self._attrs:
+                self._attrs[k] = attrs[k]
 
     @property
     def DBFILE(cls):
@@ -50,14 +59,11 @@ class Task(Model):
             'body':      '',
             'priority':  0
         }
-        # TODO: make in pythonic way
-        for k, v in self._attrs.iteritems():
-            if k in attrs:
-                self._attrs[k] = attrs[k]
+        self.attrs = attrs
         self._isnew = isnew
 
     def todict(self):
-        vdict = self._attrs
+        vdict = self._attrs.copy()
         vdict['isnew'] = self._isnew
         vdict['tags'] = [ tag.todict() for tag in self._tags ]
         return vdict
@@ -144,7 +150,7 @@ class Task(Model):
 
     def save(self):
         cur = self._dbcon.cursor()
-        attrs = self.attrs
+        attrs = self.attrs.copy()
         pk = attrs['id']
         del attrs['id']
         if self.isnew:
@@ -340,6 +346,12 @@ class TaskList(object):
         self.last_task_at_cursor = task
         return task 
 
+    def getbyid(self, id):
+        return [task for task in self._tasks if task.id == id][0]
+
+    def add(self, task):
+        self._tasks.append(task)
+
     def last_task_lnum(self):
         last_task = self.last_task_at_cursor
         try:
@@ -387,6 +399,10 @@ class Tag(Model):
 
     def todict(self):
         return self._attrs
+
+    def createmany(self, attrslist):
+        return [Tag({'name': attrs['name'], 'task_id': attrs['task_id']})
+                for attrs in attrslist]
 
     def save(self):
         # TODO: same as in Task.save()
