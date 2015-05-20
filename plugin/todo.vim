@@ -445,14 +445,14 @@ function! s:DeleteTask(task) abort
 endfunction
 
 function! s:ChangePriority(value) abort
-    let l:task = b:tasks_table.getcurtask() 
-
     " TODO: repeated code
-    python newtask = todo.Task(vim.eval('l:task'), vim.eval('l:task.isnew'),
-                              \vim.eval('l:task.tags'))
-    python newtask.priority = vim.eval('a:value')
-    python newtask.save()
-
+    let l:idx = b:tasks_table.getcuridx2()
+    python << py
+idx = int(vim.eval('l:idx'))
+task = tasklist.get(idx)
+task.priority = vim.eval('a:value')
+task.save()
+py
     call b:tasks_table.update(1)
 endfunction
 
