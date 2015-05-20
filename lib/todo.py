@@ -56,6 +56,7 @@ class Task(Model):
             'id':        '',
             'title':     '',
             'create_date': time.time(),
+            'done_date': None,
             'body':      '',
             'priority':  0
         }
@@ -64,6 +65,7 @@ class Task(Model):
 
     def todict(self):
         vdict = self._attrs.copy()
+        vdict['done_date'] = ''
         vdict['isnew'] = self._isnew
         vdict['tags'] = [ tag.todict() for tag in self._tags ]
         return vdict
@@ -83,6 +85,14 @@ class Task(Model):
     @tags.setter
     def tags(self, value):
         self._tags = value
+
+    @property
+    def done_date(self):
+        return self._attrs['done_date']
+
+    @done_date.setter
+    def done_date(self, value):
+        self._attrs['done_date'] = value
 
     @property
     def id(self):
@@ -348,6 +358,12 @@ class TaskList(object):
 
     def getbyid(self, id):
         return [task for task in self._tasks if task.id == id][0]
+
+    def get(self, idx):
+        return self._tasks[idx]
+
+    def delete(self, idx):
+        del self._tasks[idx]
 
     def add(self, task):
         self._tasks.append(task)

@@ -256,6 +256,7 @@ function! s:Open() abort
         python from todo import Task
         python from todo import Tag
         python from datetime import datetime
+        python from time import time
         exe 'python todo.setdb("' . s:FILE_DB . '")'
         let g:todo_py_loaded = 1
     " endif
@@ -465,6 +466,18 @@ function! s:ApplyTagFilter()
     call b:tasks_table.filterbytags(l:tagnames)
 endfunction
 
+function! s:FinishTask()
+    let l:idx = b:tasks_table.getcuridx2()
+    python << py
+idx = int(vim.eval('l:idx'))
+task = tasklist.get(idx)
+task.done_date = time()
+task.save()
+tasklist.delete(idx)
+py
+    call b:tasks_table.update()
+endfunction
+
 function! s:ApplyMainBufMaps()
     nnoremap <silent> <buffer> n :call <SID>EditTask({'isnew': 1})<CR>
     nnoremap <silent> <buffer> <nowait> gd :call <SID>DeleteTask(b:tasks_table.getcurtask())<CR>
@@ -472,7 +485,7 @@ function! s:ApplyMainBufMaps()
     nnoremap <silent> <buffer> <nowait> = :call <SID>ChangePriority('+1')<CR>
     nnoremap <silent> <buffer> - :call <SID>ChangePriority(-1)<CR>
     nnoremap <silent> <buffer> gp :call <SID>SetPriority()<CR>
-    nnoremap <silent> <buffer> x :call <SID>TodoFinish()<CR>
+    nnoremap <silent> <buffer> ga :call <SID>FinishTask()<CR>
     nnoremap <silent> <buffer> gf :call <SID>ApplyTagFilter()<CR>
     nnoremap <silent> <buffer> ? :call b:help_widget.toggle()<CR>
 endfunction
