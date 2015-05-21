@@ -213,16 +213,7 @@ function! s:TasksTableWidget._tstotimeformat(ts, format)
 endfunction
 
 function! s:TasksTableWidget.getcurtask() abort
-    let l:baselnum = self._baselnum
-    let l:curlnum = line('.')
-
-    if l:curlnum < l:baselnum
-        return
-    endif
-
-    let self._curidx = l:curlnum - l:baselnum
-
-    return self._tasks[self._curidx]
+    return self._tasks[self.getcuridx2()]
 endfunction
 
 function! s:TasksTableWidget.getcuridx() abort
@@ -397,7 +388,7 @@ function! s:OnEditBufExit()
         python task = Task(vim.eval('l:task'))
         python tasklist.add(task)
     else
-        python task = tasklist.getbyid(int(vim.eval('l:task.id')))
+        python task = tasklist.findbyid(int(vim.eval('l:task.id')))
         " Link to task in tasklist
         python task.attrs = vim.eval('l:attrs')
     endif
@@ -469,16 +460,21 @@ function! s:DeleteTask(task) abort
         return
     endif
 
-    exe 'python Task().delbyid(' . a:task.id . ')'
-    call b:tasks_table.deltask() 
+    " TODO: repeated code
+    let l:id = b:tasks_table.getcurtask().id
+    python << py
+Task().delbyid(int(vim.eval('l:id')))
+tasklist.delbyid(int(vim.eval('l:id')))
+py
+    call b:tasks_table.update()
 endfunction
 
 function! s:ChangePriority(value) abort
     " TODO: repeated code
-    let l:idx = b:tasks_table.getcuridx2()
+    let l:id = b:tasks_table.getcurtask().id
     python << py
-idx = int(vim.eval('l:idx'))
-task = tasklist.get(idx)
+id = int(vim.eval('l:id'))
+task = tasklist.findbyid(id)
 task.priority = vim.eval('a:value')
 task.save()
 py
@@ -496,13 +492,14 @@ function! s:ApplyTagFilter()
 endfunction
 
 function! s:FinishTask()
-    let l:idx = b:tasks_table.getcuridx2()
+    " TODO: repeated code
+    let l:id = b:tasks_table.getcurtask().id
     python << py
-idx = int(vim.eval('l:idx'))
-task = tasklist.get(idx)
+id = int(vim.eval('l:id'))
+task = tasklist.findbyid(id)
 task.done_date = time()
 task.save()
-tasklist.delete(idx)
+tasklist.delbyid(int(vim.eval('l:id')))
 py
     call b:tasks_table.update()
 endfunction

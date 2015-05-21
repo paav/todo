@@ -356,7 +356,7 @@ class TaskList(object):
         self.last_task_at_cursor = task
         return task 
 
-    def getbyid(self, id):
+    def findbyid(self, id):
         return [task for task in self._tasks if task.id == id][0]
 
     def get(self, idx):
@@ -364,6 +364,11 @@ class TaskList(object):
 
     def delete(self, idx):
         del self._tasks[idx]
+
+    def delbyid(self, id):
+        for i, task in enumerate(self._tasks):
+            if task.id == id:
+                del self._tasks[i]
 
     def add(self, task):
         self._tasks.append(task)
