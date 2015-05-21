@@ -172,7 +172,16 @@ function! s:TasksTableWidget._tasktorow(task) abort
     let tag = get(a:task.tags, 0, {})
     let tagname = !empty(tag) ? tag.name : '' 
 
-    return printf('%-13s%-32s%-10s%-5s',
+    " Marks for syntax highlighting
+    let l:hl = ''
+
+    if a:task.priority > 5
+        let l:hl = '!'
+    elseif a:task.priority > 3
+        let l:hl = '?'
+    endif
+
+    return printf(l:hl . '%-13s%-32s%-10s%-5s',
         \self._tstotimeformat(a:task.create_date, '%-d %b'),
         \a:task.title, tagname, a:task.priority) 
 endfunction
