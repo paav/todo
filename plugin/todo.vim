@@ -167,7 +167,7 @@ endfunction
 function! s:TasksTableWidget._renderHead() abort
     let self._headlen = 2
     let @o = printf('%-9s%-38s%-13s%-3s', 'Created', 'Title', 'Tag', 'Pri') 
-    let @o .= "\n" . repeat('-', 60)
+    let @o .= "\n" . repeat('─', 64)
     put o
 endfunction
 
