@@ -57,6 +57,7 @@ function! s:HelpWidget.create() abort
     let self._isvisible = 0
     let self._curtext = self._TEXT_INFO
     let self._prevtext = []
+    let self._firstlnum = 1
     return copy(self)
 endfunction
 
@@ -65,7 +66,6 @@ function! s:HelpWidget.render() abort
     let &l:modifiable = 1
 
     if !empty(self._prevtext) 
-        " Only del command moves cursor, append -- doesn't
         let l:oldpos = getcurpos()
 
         let prev_text_len = len(self._prevtext)
@@ -76,7 +76,7 @@ function! s:HelpWidget.render() abort
         call setpos('.', l:oldpos)
     endif
 
-    call append(0, self._curtext)
+    call append(self._firstlnum - 1, self._curtext)
 
     let self._isvisible = 1
     let &l:modifiable = l:save_opt
@@ -97,6 +97,10 @@ function! s:HelpWidget.toggle() abort
     endif
     
     call self.render()
+endfunction
+
+function! s:HelpWidget.getlastlnum() abort
+    return len(self._curtext) + 1
 endfunction
 
 
@@ -141,7 +145,14 @@ function! s:TasksTableWidget.filterbytags(tagnames) abort
     call self.update()
 endfunction
 
+function! s:TasksTableWidget.setfirstlnum(lnum) abort
+    let self._firstlnum = a:lnum
+    let self._baselnum = a:lnum + self._headlen
+endfunction
+
 function! s:TasksTableWidget.render() abort
+    let self._firstlnum = line('.') + 1
+
     let l:save_opt = &l:modifiable
     let &l:modifiable = 1
     " exe a:lnum . ',$delete'
@@ -154,10 +165,10 @@ function! s:TasksTableWidget.render() abort
 endfunction
 
 function! s:TasksTableWidget._renderHead() abort
+    let self._headlen = 2
     let @o = printf('%-10s%-32s%-10s%-10s', 'Created', 'Title', 'Tag', 'Pri') 
     let @o .= "\n" . repeat('-', 60)
     put o
-    let self._baselnum = line('.') + 1
 endfunction
 
 function! s:TasksTableWidget._renderBody() abort
@@ -494,6 +505,12 @@ py
     call b:tasks_table.update()
 endfunction
 
+function! s:ToggleHelp() abort
+    call b:help_widget.toggle()
+    let l:lnum = b:help_widget.getlastlnum()
+    call b:tasks_table.setfirstlnum(l:lnum + 1)
+endfunction
+
 function! s:ApplyMainBufMaps()
     nnoremap <silent> <buffer> n :call <SID>EditTask({'isnew': 1})<CR>
     nnoremap <silent> <buffer> <nowait> gd :call <SID>DeleteTask(b:tasks_table.getcurtask())<CR>
@@ -503,7 +520,7 @@ function! s:ApplyMainBufMaps()
     nnoremap <silent> <buffer> gp :call <SID>SetPriority()<CR>
     nnoremap <silent> <buffer> ga :call <SID>FinishTask()<CR>
     nnoremap <silent> <buffer> gf :call <SID>ApplyTagFilter()<CR>
-    nnoremap <silent> <buffer> ? :call b:help_widget.toggle()<CR>
+    nnoremap <silent> <buffer> gh :call <SID>ToggleHelp()<CR>
 endfunction
 
 function! s:ApplyMainBufSettings()
