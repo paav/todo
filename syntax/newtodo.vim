@@ -9,7 +9,7 @@ endif
 syntax clear
 
 syntax match ntodoHelp /^".*/ contains=ntodoIgnore
-syntax match ntodoIgnore /\v["?!]/ contained conceal 
+syntax match ntodoIgnore /\v^["?!]/ contained conceal 
 syntax match ntodoErrPri /^!.*/ contains=ntodoIgnore
 syntax match ntodoWarnPri /^?.*/ contains=ntodoIgnore
 
