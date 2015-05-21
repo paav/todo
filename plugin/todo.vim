@@ -182,8 +182,15 @@ function! s:TasksTableWidget._tasktorow(task) abort
     endif
 
     return printf(l:hl . '%-13s%-32s%-10s%-5s',
-        \self._tstotimeformat(a:task.create_date, '%-d %b'),
-        \a:task.title, tagname, a:task.priority) 
+        \self._tstotimeformat(a:task.create_date, '%d %b'),
+        \self._cut(a:task.title, 34), self._cut(tagname, 10), a:task.priority)
+endfunction
+
+function! s:TasksTableWidget._cut(str, len)
+    let l:TAIL = '...'
+    let l:taillen = len(l:TAIL)
+
+    return len(a:str) <= a:len ? a:str : a:str[:a:len - l:taillen] . l:TAIL
 endfunction
 
 function! s:TasksTableWidget._tstotimeformat(ts, format)
