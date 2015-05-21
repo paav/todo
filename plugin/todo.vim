@@ -166,7 +166,7 @@ endfunction
 
 function! s:TasksTableWidget._renderHead() abort
     let self._headlen = 2
-    let @o = printf('%-10s%-32s%-10s%-10s', 'Created', 'Title', 'Tag', 'Pri') 
+    let @o = printf('%-9s%-38s%-13s%-3s', 'Created', 'Title', 'Tag', 'Pri') 
     let @o .= "\n" . repeat('-', 60)
     put o
 endfunction
@@ -192,7 +192,7 @@ function! s:TasksTableWidget._tasktorow(task) abort
         let l:hl = '?'
     endif
 
-    return printf(l:hl . '%-13s%-32s%-10s%-5s',
+    return printf(l:hl . '%-12s%-38s%-13s%2s',
         \self._tstotimeformat(a:task.create_date, '%d %b'),
         \self._cut(a:task.title, 34), self._cut(tagname, 10), a:task.priority)
 endfunction
