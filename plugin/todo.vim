@@ -161,6 +161,7 @@ function! s:TasksTableWidget.render() abort
     call self._renderHead()
     call self._renderBody()
 
+    let self._baselnum = self._firstlnum + self._headlen
     let self._isvisible = 1
     let &l:modifiable = l:save_opt
 endfunction
