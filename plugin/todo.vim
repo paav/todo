@@ -13,6 +13,7 @@ set cpo&vim
 
 let s:BUFNAME_MAIN = 'TodoMain'
 let s:BUFNAME_EDIT = 'TodoEdit'
+let s:VERSION = '0.1.0'
 let s:MAINWIN_W = 65
 let s:DIR_BASE = escape(expand('<sfile>:p:h:h'), '\')
 let s:DIR_LIB = s:DIR_BASE . '/lib'
@@ -44,12 +45,12 @@ endfunction
 " ============================================================ 
 
 let s:HelpWidget = {
-    \'_TEXT_INFO': ['Press ? for help'],
+    \'_TEXT_INFO': ['Press gh for help'],
     \'_TEXT_HELP': [
-            \'"j": move cursor down',
-            \'"k": move cursor up',
-            \'"n": new task',
-            \'"e": edit task'
+            \'"Vim-todo plugin v' . s:VERSION,
+            \'"gn: new task      = : raise pri   ga: finish task',
+            \'"ge: edit task     - : drop pri    gf: filter by tags',
+            \'"gd: delete task   gp: set pri     gh: toggle help',
         \]
 \}
 
