@@ -1,5 +1,5 @@
 " Vim global plugin for handling tasks
-" Last Change:	2015 May 02
+" Last Change:	2015 May 22
 " Maintainer:	Alexey Panteleiev <paav at inbox dot ru>
 
 if exists('g:loaded_todo')
@@ -13,17 +13,16 @@ set cpo&vim
 
 let s:BUFNAME_MAIN = 'TodoMain'
 let s:BUFNAME_EDIT = 'TodoEdit'
-let s:VERSION = '0.1.0'
-let s:MAINWIN_W = 65
-let s:DIR_BASE = escape(expand('<sfile>:p:h:h'), '\')
-let s:DIR_LIB = s:DIR_BASE . '/lib'
-let s:FILE_DB = s:DIR_BASE . '/data/todo.db'
-let s:TAG_MARK = '#'
+let s:VERSION      = '0.1.0'
+let s:MAINWIN_W    = 65
+let s:DIR_BASE     = escape(expand('<sfile>:p:h:h'), '\')
+let s:DIR_LIB      = s:DIR_BASE . '/lib'
+let s:FILE_DB      = s:DIR_BASE . '/data/todo.db'
+let s:TAG_MARK     = '#'
 
 command! Todo call s:Open()
 command! TodoToggle call s:Toggle()
 command! TodoClose call s:Close()
-
 
 augroup todo
     autocmd!
@@ -33,15 +32,38 @@ augroup todo
     exe 'autocmd BufWinLeave ' . s:BUFNAME_EDIT . ' call s:OnEditBufExit()'
 augroup END
 
-function! s:WinIsVisible(bufname) abort
-    if s:GetWinNum(a:bufname) != -1
-        return 1
-    endif
-    return 0
+function! s:ApplyMainBufMaps()
+    nnoremap <silent> <buffer>          gn :call <SID>NewTask()<CR>
+    nnoremap <silent> <buffer> <nowait> gd :call <SID>DeleteTask()<CR>
+    nnoremap <buffer>                   ge :call <SID>EditTask()<CR>
+    nnoremap <silent> <buffer> <nowait> =  :call <SID>ChangePriority('+1')<CR>
+    nnoremap <silent> <buffer>          -  :call <SID>ChangePriority(-1)<CR>
+    nnoremap <silent> <buffer>          gp :call <SID>SetPriority()<CR>
+    nnoremap <silent> <buffer>          ga :call <SID>FinishTask()<CR>
+    nnoremap <silent> <buffer>          gf :call <SID>ApplyTagFilter()<CR>
+    nnoremap <silent> <buffer>          gh :call <SID>ToggleHelp()<CR>
 endfunction
 
+function! s:ApplyMainBufSettings()
+    setlocal buftype=nofile
+    setlocal noswapfile
+    setlocal nobuflisted
+    setlocal nomodifiable
+    setlocal nonumber
+    setlocal cursorline
+    setlocal filetype=newtodo
+    setlocal conceallevel=3
+    setlocal concealcursor=nc
+endfunction
 
-" Class HelpWidget
+function! s:ApplyEditBufSettings()
+    setlocal noswapfile
+    setlocal nonumber
+    setlocal nobuflisted
+    setlocal bufhidden=wipe
+endfunction
+
+" Class HelpWidget {{{
 " ============================================================ 
 
 let s:HelpWidget = {
@@ -103,9 +125,9 @@ endfunction
 function! s:HelpWidget.getlastlnum() abort
     return len(self._curtext) + 1
 endfunction
+"}}}
 
-
-" Class TasksTableWidget
+" Class TasksTableWidget {{{
 " ============================================================ 
 
 let s:TasksTableWidget = {}
@@ -264,6 +286,7 @@ function! s:TasksTableWidget.deltask(...) abort
     exe l:lnum . 'delete'
     let &l:modifiable = l:save_opt
 endfunction
+" }}}
 
 function! s:Open() abort
         python reload(todo)
@@ -307,14 +330,6 @@ function! s:Close() abort
     close
 endfunction
 
-function! s:GotoWin(bufname) abort
-    exe s:GetWinNum(a:bufname) . 'wincmd w' 
-endfunction
-
-function! s:GetWinNum(bufname) abort
-    return bufwinnr(bufnr(a:bufname))
-endfunction
-
 function! s:Toggle()
     if s:WinIsVisible(s:BUFNAME_MAIN)
         call s:Close()
@@ -323,13 +338,18 @@ function! s:Toggle()
     endif
 endfunction
 
+function! s:ToggleHelp() abort
+    call b:help_widget.toggle()
+    let l:lnum = b:help_widget.getlastlnum()
+    call b:tasks_table.setfirstlnum(l:lnum + 1)
+endfunction
+
 function! s:OpenMainWin() abort
     exe 'topleft ' . s:MAINWIN_W . 'vnew ' . s:BUFNAME_MAIN
 endfunction
 
-function! s:TodoClose()
-    exe bufwinnr(bufnr('Todo')) . "wincmd w"
-    quit
+function! s:GotoWin(bufname) abort
+    exe s:GetWinNum(a:bufname) . 'wincmd w' 
 endfunction
 
 " TODO: problem with write to curret dir access
@@ -337,21 +357,39 @@ function! s:OpenEditWin() abort
     silent exe 'new ' . s:BUFNAME_EDIT
 endfunction
 
-function! s:EditTask(task) abort
+function! s:GetWinNum(bufname) abort
+    return bufwinnr(bufnr(a:bufname))
+endfunction
+
+function! s:WinIsVisible(bufname) abort
+    if s:GetWinNum(a:bufname) != -1
+        return 1
+    endif
+
+    return 0
+endfunction
+
+function! s:EditTask(...) abort
+    if a:0 > 1
+        throw 'Vim-todo:EditTask:toomanyargs'
+    endif
+
+    let l:task = exists('a:1') ? a:1 : b:tasks_table.getcurtask()
+
     call s:OpenEditWin()
     let old_undolevels = &l:undolevels
     let &l:undolevels = -1
 
-    if !a:task.isnew
-        let @o = a:task.title
+    if !l:task.isnew
+        let @o = l:task.title
 
-        if a:task.body != ''
-            let @o .= "\n" . a:task.body
+        if l:task.body != ''
+            let @o .= "\n" . l:task.body
         endif
 
-        if !empty(a:task.tags)
+        if !empty(l:task.tags)
             let l:tagnames = []
-            for l:tag in a:task.tags
+            for l:tag in l:task.tags
                 let l:tagnames = add(l:tagnames, l:tag.name)
             endfor
             let @o .= "\n" . s:TAG_MARK . join(l:tagnames, ' ') 
@@ -362,7 +400,11 @@ function! s:EditTask(task) abort
         let &l:undolevels = old_undolevels
     endif
 
-    let b:task = a:task
+    let b:task = l:task
+endfunction
+
+function! s:NewTask() abort
+    call s:EditTask({isnew: 1})
 endfunction
 
 function! s:OnEditBufExit()
@@ -450,7 +492,7 @@ function! s:CreateTags(line)
     return l:tags
 endfunction
 
-function! s:DeleteTask(task) abort
+function! s:DeleteTask() abort
     let l:YES = 'yes'
     let l:PROMPT = "Type '" . l:YES . "' to delete task at cursor: "
     let l:answer = input(l:PROMPT, '')
@@ -504,42 +546,7 @@ py
     call b:tasks_table.update()
 endfunction
 
-function! s:ToggleHelp() abort
-    call b:help_widget.toggle()
-    let l:lnum = b:help_widget.getlastlnum()
-    call b:tasks_table.setfirstlnum(l:lnum + 1)
-endfunction
-
-function! s:ApplyMainBufMaps()
-    nnoremap <silent> <buffer> n :call <SID>EditTask({'isnew': 1})<CR>
-    nnoremap <silent> <buffer> <nowait> gd :call <SID>DeleteTask(b:tasks_table.getcurtask())<CR>
-    nnoremap <buffer> e :call <SID>EditTask(b:tasks_table.getcurtask())<CR>
-    nnoremap <silent> <buffer> <nowait> = :call <SID>ChangePriority('+1')<CR>
-    nnoremap <silent> <buffer> - :call <SID>ChangePriority(-1)<CR>
-    nnoremap <silent> <buffer> gp :call <SID>SetPriority()<CR>
-    nnoremap <silent> <buffer> ga :call <SID>FinishTask()<CR>
-    nnoremap <silent> <buffer> gf :call <SID>ApplyTagFilter()<CR>
-    nnoremap <silent> <buffer> gh :call <SID>ToggleHelp()<CR>
-endfunction
-
-function! s:ApplyMainBufSettings()
-    setlocal buftype=nofile
-    setlocal noswapfile
-    setlocal nobuflisted
-    setlocal nomodifiable
-    setlocal nonumber
-    setlocal cursorline
-    setlocal filetype=newtodo
-    setlocal conceallevel=3
-    setlocal concealcursor=nc
-endfunction
-
-function! s:ApplyEditBufSettings()
-    setlocal noswapfile
-    setlocal nonumber
-    setlocal nobuflisted
-    setlocal bufhidden=wipe
-endfunction
-
 let &cpo = s:old_cpo
 unlet s:old_cpo
+
+" vim:fdm=marker
