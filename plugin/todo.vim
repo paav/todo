@@ -137,12 +137,13 @@ function! s:TasksTableWidget.create() abort
     python tasklist.load()
     let self._tasks = pyeval('tasklist.tovimlist()')
     let self._curidx = 0
+    let self._MSG_NOTASKS = '<there are no such tasks>'
     return copy(self)
 endfunction
 
 function! s:TasksTableWidget.update(...) abort
     let l:ishard = !exists('a:1') ? 0 : a:1
-    let l:lasttask = self._tasks[self.getcuridx2()]
+    let l:lasttask = self.getcurtask() 
 
     if l:ishard
         python tasklist.load()
@@ -156,10 +157,16 @@ function! s:TasksTableWidget.update(...) abort
     let l:save_opt = &l:modifiable
     let &l:modifiable = 1
     exe self._baselnum . ',' . '$' . 'delete'
-    call self._renderBody()
+
+    if !empty(self._tasks)
+        call self._renderBody()
+    else
+        call setline(line('.') + 1, self._MSG_NOTASKS)
+    endif
+
     let &l:modifiable = l:save_opt
     
-    let l:curlnum = self._gettasklnum(l:lasttask)
+    let l:curlnum = empty(l:lasttask) ? 0 : self._gettasklnum(l:lasttask)
     call cursor(l:curlnum == -1 ? self._baselnum : l:curlnum, 0)
 endfunction
 
@@ -235,7 +242,10 @@ function! s:TasksTableWidget._tstotimeformat(ts, format)
 endfunction
 
 function! s:TasksTableWidget.getcurtask() abort
-    return self._tasks[self.getcuridx2()]
+    let l:idx = self.getcuridx2()
+    let l:line = getline(self._idxtolnum(l:idx))
+
+    return l:idx == -1 || l:line ==# self._MSG_NOTASKS ? {} : self._tasks[l:idx]
 endfunction
 
 function! s:TasksTableWidget.getcuridx() abort
@@ -243,10 +253,16 @@ function! s:TasksTableWidget.getcuridx() abort
 endfunction
 
 function! s:TasksTableWidget.getcuridx2() abort
-    return line('.') - self._baselnum 
+    let l:idx = line('.') - self._baselnum 
+
+    return l:idx < 0 ? -1 : l:idx
 endfunction
 
 function! s:TasksTableWidget._gettasklnum(task) abort
+    if !has_key(a:task, 'id')
+        throw "TasksTableWidget:_gettasklnum: there is no 'id' key in the dict"
+    endif
+
     let l:i = 0
 
     for l:t in self._tasks 
@@ -261,7 +277,8 @@ function! s:TasksTableWidget._gettasklnum(task) abort
 endfunction
 
 function! s:TasksTableWidget._idxtolnum(idx) abort
-    let l:maxidx = len(self._tasks) - 1
+    let l:len = len(self._tasks)
+    let l:maxidx = l:len != 0 ? l:len - 1 : 0
 
     if a:idx < -l:maxidx - 1 || a:idx > l:maxidx
         throw 'TasksTableWidget:wrongindex'
