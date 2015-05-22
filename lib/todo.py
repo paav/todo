@@ -142,10 +142,10 @@ class Task(Model):
             self._isnew = False
             pk = cur.lastrowid
             self._attrs['id'] = pk
+        Tag().delall('task_id=?', (pk,))
         if self.tags:
             for tag in self.tags:
                 tag.task_id = pk
-            Tag().delall('task_id=?', (pk,))
             Tag().saveall(self.tags)
 
     @property
