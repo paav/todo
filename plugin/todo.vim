@@ -19,6 +19,7 @@ let s:DIR_BASE     = escape(expand('<sfile>:p:h:h'), '\')
 let s:DIR_LIB      = s:DIR_BASE . '/lib'
 let s:FILE_DB      = s:DIR_BASE . '/data/todo.db'
 let s:TAG_MARK     = '#'
+let s:MSG_NOTASKS  = 'There are no tasks under the cursor.'
 
 command! Todo call s:Open()
 command! TodoToggle call s:Toggle()
@@ -138,12 +139,18 @@ function! s:TasksTableWidget.create() abort
     let self._tasks = pyeval('tasklist.tovimlist()')
     let self._curidx = 0
     let self._MSG_NOTASKS = '<there are no such tasks>'
+    let self._CLASSNAME = 'TasksTableWidget'
     return copy(self)
 endfunction
 
 function! s:TasksTableWidget.update(...) abort
     let l:ishard = !exists('a:1') ? 0 : a:1
-    let l:lasttask = self.getcurtask() 
+
+    try
+        let l:lasttask = self.getcurtask() 
+    catch /TasksTableWidget:CursorPosError/ 
+        let l:lasttask = {}
+    endtry
 
     if l:ishard
         python tasklist.load()
@@ -151,10 +158,8 @@ function! s:TasksTableWidget.update(...) abort
 
     let self._tasks = pyeval('tasklist.tovimlist()')
 
-    " TODO: move to separate function
-    let l:lastlnum = self._baselnum + len(self._tasks) - 1
     " TODO: repeated code
-    let l:save_opt = &l:modifiable
+    let l:saved_opt = &l:modifiable
     let &l:modifiable = 1
     exe self._baselnum . ',' . '$' . 'delete'
 
@@ -164,7 +169,7 @@ function! s:TasksTableWidget.update(...) abort
         call setline(line('.') + 1, self._MSG_NOTASKS)
     endif
 
-    let &l:modifiable = l:save_opt
+    let &l:modifiable = l:saved_opt
     
     let l:curlnum = empty(l:lasttask) ? 0 : self._gettasklnum(l:lasttask)
     call cursor(l:curlnum == -1 ? self._baselnum : l:curlnum, 0)
@@ -242,10 +247,18 @@ function! s:TasksTableWidget._tstotimeformat(ts, format)
 endfunction
 
 function! s:TasksTableWidget.getcurtask() abort
-    let l:idx = self.getcuridx2()
-    let l:line = getline(self._idxtolnum(l:idx))
+    try
+        let l:idx = self.getcuridx2()
+    catch /TasksTableWidget:CursorPosError/ 
+        throw v:exception
+    endtry
 
-    return l:idx == -1 || l:line ==# self._MSG_NOTASKS ? {} : self._tasks[l:idx]
+    if getline(self._idxtolnum(l:idx)) ==# self._MSG_NOTASKS
+        throw self._CLASSNAME
+            \. ':CursorPosError: there is no task under the cursor.'
+    endif
+
+    return self._tasks[l:idx]
 endfunction
 
 function! s:TasksTableWidget.getcuridx() abort
@@ -255,7 +268,11 @@ endfunction
 function! s:TasksTableWidget.getcuridx2() abort
     let l:idx = line('.') - self._baselnum 
 
-    return l:idx < 0 ? -1 : l:idx
+    if l:idx < 0
+        throw self._CLASSNAME . ":CursorPosError: cursor isn't in table body."
+    endif
+
+    return l:idx
 endfunction
 
 function! s:TasksTableWidget._gettasklnum(task) abort
@@ -386,12 +403,18 @@ function! s:WinIsVisible(bufname) abort
     return 0
 endfunction
 
-function! s:EditTask(...) abort
-    if a:0 > 1
-        throw 'Vim-todo:EditTask:toomanyargs'
-    endif
+function! s:Echo(msg) abort
+    let l:ECHO_PFX = 'Todo: '
+    echo l:ECHO_PFX . a:msg 
+endfunction
 
-    let l:task = exists('a:1') ? a:1 : b:tasks_table.getcurtask()
+function! s:EditTask(...) abort
+    try
+        let l:task = exists('a:1') ? a:1 : b:tasks_table.getcurtask()
+    catch /TasksTableWidget:CursorPosError/
+        call s:Echo(s:MSG_NOTASKS)
+        return
+    endtry
 
     call s:OpenEditWin()
     let old_undolevels = &l:undolevels
@@ -460,7 +483,7 @@ function! s:OnEditBufExit()
     call b:tasks_table.update()
 endfunction
 
-function! s:UpdateTask(task)
+function! s:UpdateTask(task) abort
     silent 1,$g/^\s*$/d
 
     let l:firstline = getline(1)
@@ -510,6 +533,14 @@ function! s:CreateTags(line)
 endfunction
 
 function! s:DeleteTask() abort
+    " TODO: repeated code
+    try
+        let l:id = b:tasks_table.getcurtask().id
+    catch /TasksTableWidget:CursorPosError/
+        call s:Echo(s:MSG_NOTASKS)
+        return
+    endtry
+
     let l:YES = 'yes'
     let l:PROMPT = "Type '" . l:YES . "' to delete task at cursor: "
     let l:answer = input(l:PROMPT, '')
@@ -519,8 +550,6 @@ function! s:DeleteTask() abort
         return
     endif
 
-    " TODO: repeated code
-    let l:id = b:tasks_table.getcurtask().id
     python << py
 Task().delbyid(int(vim.eval('l:id')))
 tasklist.delbyid(int(vim.eval('l:id')))
@@ -530,7 +559,13 @@ endfunction
 
 function! s:ChangePriority(value) abort
     " TODO: repeated code
-    let l:id = b:tasks_table.getcurtask().id
+    try
+        let l:id = b:tasks_table.getcurtask().id
+    catch /TasksTableWidget:CursorPosError/
+        call s:Echo(s:MSG_NOTASKS)
+        return
+    endtry
+
     python << py
 id = int(vim.eval('l:id'))
 task = tasklist.findbyid(id)
@@ -552,7 +587,13 @@ endfunction
 
 function! s:FinishTask()
     " TODO: repeated code
-    let l:id = b:tasks_table.getcurtask().id
+    try
+        let l:id = b:tasks_table.getcurtask().id
+    catch /TasksTableWidget:CursorPosError/
+        call s:Echo(s:MSG_NOTASKS)
+        return
+    endtry
+
     python << py
 id = int(vim.eval('l:id'))
 task = tasklist.findbyid(id)
