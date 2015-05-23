@@ -148,6 +148,7 @@ function! s:TasksTableWidget.update(...) abort
 
     try
         let l:lasttask = self.getcurtask() 
+        let l:lastlnum = line('.')
     catch /TasksTableWidget:CursorPosError/ 
         let l:lasttask = {}
     endtry
@@ -172,7 +173,7 @@ function! s:TasksTableWidget.update(...) abort
     let &l:modifiable = l:saved_opt
     
     let l:curlnum = empty(l:lasttask) ? 0 : self._gettasklnum(l:lasttask)
-    call cursor(l:curlnum == -1 ? self._baselnum : l:curlnum, 0)
+    call cursor(l:curlnum == -1 ? l:lastlnum : l:curlnum, 0)
 endfunction
 
 function! s:TasksTableWidget.filterbytags(tagnames) abort
