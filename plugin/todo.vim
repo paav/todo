@@ -1,5 +1,5 @@
 " Vim global plugin for handling tasks
-" Last Change:	2015 May 22
+" Last Change:	2015 May 24
 " Maintainer:	Alexey Panteleiev <paav at inbox dot ru>
 
 if exists('g:loaded_todo')
@@ -47,6 +47,7 @@ endfunction
 
 function! s:ApplyMainBufSettings()
     setlocal buftype=nofile
+    setlocal bufhidden=hide
     setlocal noswapfile
     setlocal nobuflisted
     setlocal nomodifiable
@@ -339,25 +340,22 @@ function! s:Open() abort
         let g:todo_py_loaded = 1
     " endif
 
-    if s:WinIsVisible(s:BUFNAME_MAIN)
+    if s:BufIsvisible(s:BUFNAME_MAIN)
         return
     endif
 
-    call s:OpenMainWin()
-    setlocal modifiable
-    1,$delete
-    setlocal nomodifiable
-    
-    " if !exists('b:help_widget')
+    if s:BufExists(s:BUFNAME_MAIN)
+        call s:OpenMainBuf()
+        call b:tasks_table.update()
+    else
+        call s:CreateMainBuf()
+
         let b:help_widget = s:HelpWidget.create()
-    " endif
-
-    " if !b:help_widget.isVisible()
         call b:help_widget.render()
-    " endif
 
-    let b:tasks_table = s:TasksTableWidget.create()
-    call b:tasks_table.render()
+        let b:tasks_table = s:TasksTableWidget.create()
+        call b:tasks_table.render()
+    endif
 endfunction
 
 function! s:Close() abort
@@ -366,7 +364,7 @@ function! s:Close() abort
 endfunction
 
 function! s:Toggle()
-    if s:WinIsVisible(s:BUFNAME_MAIN)
+    if s:BufIsvisible(s:BUFNAME_MAIN)
         call s:Close()
     else
         call s:Open()
@@ -379,7 +377,11 @@ function! s:ToggleHelp() abort
     call b:tasks_table.setfirstlnum(l:lnum + 1)
 endfunction
 
-function! s:OpenMainWin() abort
+function! s:OpenMainBuf() abort
+    exe 'topleft ' . s:MAINWIN_W . 'vs +buffer' . bufnr(s:BUFNAME_MAIN)
+endfunction
+
+function! s:CreateMainBuf() abort
     exe 'topleft ' . s:MAINWIN_W . 'vnew ' . s:BUFNAME_MAIN
 endfunction
 
@@ -396,12 +398,16 @@ function! s:GetWinNum(bufname) abort
     return bufwinnr(bufnr(a:bufname))
 endfunction
 
-function! s:WinIsVisible(bufname) abort
+function! s:BufIsvisible(bufname) abort
     if s:GetWinNum(a:bufname) != -1
         return 1
     endif
 
     return 0
+endfunction
+
+function! s:BufExists(bufname) abort
+    return bufnr(a:bufname) != -1 ? 1 : 0
 endfunction
 
 function! s:Echo(msg) abort
