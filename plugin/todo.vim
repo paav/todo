@@ -421,7 +421,7 @@ function! s:EditTask(...) abort
 endfunction
 
 function! s:NewTask() abort
-    call s:EditTask({isnew: 1})
+    call s:EditTask({'isnew': 1})
 endfunction
 
 function! s:OnEditBufExit()
