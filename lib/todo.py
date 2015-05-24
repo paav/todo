@@ -17,12 +17,6 @@ class Model(object):
         self._dbcon.row_factory = sqlite3.Row
         self._dbcur = self._dbcon.cursor()
 
-    def __repr__(self):
-        out = '\n<Tag object>\n'
-        for k, v in self._attrs.iteritems():
-            out += '  %-10s%s\n' % (k + ':', v) 
-        return out
-
     @property
     def attrs(self):
         return self._attrs
