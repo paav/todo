@@ -36,7 +36,7 @@ augroup END
 function! s:ApplyMainBufMaps()
     nnoremap <silent> <buffer>          gn :call <SID>NewTask()<CR>
     nnoremap <silent> <buffer> <nowait> gd :call <SID>DeleteTask()<CR>
-    nnoremap <buffer>                   ge :call <SID>EditTask()<CR>
+    nnoremap <silent> <buffer>          ge :call <SID>EditTask()<CR>
     nnoremap <silent> <buffer> <nowait> =  :call <SID>ChangePriority('+1')<CR>
     nnoremap <silent> <buffer>          -  :call <SID>ChangePriority(-1)<CR>
     nnoremap <silent> <buffer>          gp :call <SID>SetPriority()<CR>
@@ -94,7 +94,7 @@ function! s:HelpWidget.render() abort
         let l:oldpos = getcurpos()
 
         let prev_text_len = len(self._prevtext)
-        exe '1,' . prev_text_len . '$delete'
+        exe 'silent 1,' . prev_text_len . '$delete'
 
         " Correct lnum after deletion
         let l:oldpos[1] -= prev_text_len
@@ -163,7 +163,7 @@ function! s:TasksTableWidget.update(...) abort
     " TODO: repeated code
     let l:saved_opt = &l:modifiable
     let &l:modifiable = 1
-    exe self._baselnum . ',' . '$' . 'delete'
+    exe 'silent ' . self._baselnum . ',' . '$' . 'delete'
 
     if !empty(self._tasks)
         call self._renderBody()
