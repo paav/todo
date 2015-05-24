@@ -491,7 +491,9 @@ function! s:OnEditBufExit()
 endfunction
 
 function! s:UpdateTask(task) abort
-    silent 1,$g/^\s*$/d
+    " Remove empty lines at the top/end
+    silent! %s#\v%^($\n\s*)+## 
+    silent! %s#\v($\n\s*)+%$##
 
     let l:firstline = getline(1)
     let l:lastlnum = line('$')
