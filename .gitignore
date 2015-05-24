@@ -1,3 +1,3 @@
-data/
+data/todo.dev.db
 migrations/*data.sql
 *.pyc
