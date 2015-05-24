@@ -17,7 +17,8 @@ let s:VERSION      = '0.1.0'
 let s:MAINWIN_W    = 65
 let s:DIR_BASE     = escape(expand('<sfile>:p:h:h'), '\')
 let s:DIR_LIB      = s:DIR_BASE . '/lib'
-let s:FILE_DB      = s:DIR_BASE . '/data/todo.db'
+let s:DBFILE_DEF   = s:DIR_BASE . '/data/todo.db'
+let s:DBFILE       = s:DBFILE_DEF
 let s:TAG_MARK     = '#'
 let s:MSG_NOTASKS  = 'There are no tasks under the cursor.'
 
@@ -325,20 +326,33 @@ endfunction
 " }}}
 
 function! s:Open() abort
-        python reload(todo)
-    " if !exists('g:todo_py_loaded')
+    if !exists('g:todo_py_loaded')
         python import sys
-        python import vim
         exe 'python sys.path.append("' . s:DIR_LIB . '")'
-        python import todo 
+        python import vim
+        python import todo
         python from todo import tasklist
         python from todo import Task
         python from todo import Tag
         python from datetime import datetime
         python from time import time
-        exe 'python todo.setdb("' . s:FILE_DB . '")'
         let g:todo_py_loaded = 1
-    " endif
+    endif
+
+    if !exists('g:todo_dbfile')
+        let g:todo_dbfile = s:DBFILE_DEF
+    endif
+
+    if s:DBFILE !=# g:todo_dbfile
+        let s:DBFILE = g:todo_dbfile
+        python import todo
+        python from todo import tasklist
+        python from todo import Task
+        python from todo import Tag
+        exe 'silent! bwipeout ' . s:BUFNAME_MAIN
+    endif
+
+    exe 'python todo.setdb("' . s:DBFILE . '")'
 
     if s:BufIsvisible(s:BUFNAME_MAIN)
         return
