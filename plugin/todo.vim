@@ -64,6 +64,7 @@ function! s:ApplyEditBufSettings()
     setlocal nonumber
     setlocal nobuflisted
     setlocal bufhidden=wipe
+    setlocal textwidth=0
 endfunction
 
 " Class HelpWidget {{{
