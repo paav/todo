@@ -95,7 +95,7 @@ class Task(Model):
     def id(self):
         return self._attrs['id']
 
-    def findAll(self):
+    def findall(self):
         cur = self._dbcur
         sql = 'SELECT * FROM task WHERE done_date IS NULL ORDER BY priority DESC'
         tagsql =  'SELECT * FROM tag WHERE task_id=?'
@@ -175,7 +175,7 @@ class TaskList(object):
         self._filter = {}
 
     def load(self):
-        self._tasks = Task().findAll()
+        self._tasks = Task().findall()
 
     @property
     def filter(self):
@@ -264,7 +264,7 @@ class Tag(Model):
         self._dbcur.execute(sql, params)
         self._dbcon.commit()
 
-    def findAll(self, cond, params):
+    def findall(self, cond, params):
         sql = 'SELECT * FROM tag WHERE ' + cond
         self.dbcur.execute(sql, params)
         tags = []
