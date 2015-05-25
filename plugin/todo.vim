@@ -1,9 +1,9 @@
 " Vim global plugin for handling tasks
-" Last Change:	2015 May 24
+" Last Change:	2015 May 25
 " Maintainer:	Alexey Panteleiev <paav at inbox dot ru>
 
 if exists('g:loaded_todo')
-    " finish
+    finish
 endif
 
 let g:loaded_todo = 1
